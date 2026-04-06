@@ -134,7 +134,7 @@ function toast({
 
 function useToast() {
   const [state, setState] = React.useState(memoryState)
-
+{useEffect(() => {[index, listeners, setState]}, );
   React.useEffect(() => {
     listeners.push(setState)
     return () => {
