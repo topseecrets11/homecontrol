@@ -31,12 +31,19 @@
 - [x] Sentry: UNIDEN SOLO PRO, battery, last event
 - [x] WAKE FEED: 3s RTSP connection simulation with blink cursor
 
+### Phase 6 — THE AESTHETICS ENGINE
+- [x] Dark granite CSS texture (body::after radial-gradient, 0.4 opacity)
+- [x] 12px border-radius on all cards/panels via CSS var(--radius)
+- [x] CSS variable theme engine (--theme-accent, --theme-accent-dim)
+- [x] Settings panel: 3 color swatches (Neon Green #32CD32, Neon Orange #FF5E00, Royal Blue #4169E1)
+- [x] Active theme label display, localStorage persistence (state.activeTheme)
+
 ## Testing
-- Phase 1: 94% | Phase 2: 100% | Phase 4: 100% | Phase 5: 100%
+- Phase 1: 94% | Phase 2: 100% | Phase 4: 100% | Phase 5: 100% | Phase 6: 100%
 
 ## Backlog
 ### P0
-- THE SANCTUM: Library (EB Garamond), wellbeing dashboard
+- THE SANCTUM: Library (EB Garamond), wellbeing dashboard, resilience
 ### P1
 - THE ORACLE: Forecasting theater, projections
 ### P2
