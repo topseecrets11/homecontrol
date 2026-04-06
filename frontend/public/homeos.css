@@ -865,3 +865,237 @@ input[type="range"].wb-range::-moz-range-track {
   clip: rect(0,0,0,0);
   white-space: nowrap;
 }
+
+/* ============================================
+   THE ARENA — Sales Machine
+   ============================================ */
+
+.arena-module {
+  gap: 16px;
+}
+
+/* KPI Grid: 2x2 */
+.arena-kpi-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  width: 100%;
+}
+
+.kpi-card {
+  background: #141414;
+  border: 1px solid #333333;
+  padding: 18px 20px;
+  cursor: default;
+  transition: border-color 0.12s ease;
+}
+
+.kpi-card:hover {
+  border-color: #444;
+}
+
+.kpi-card-expandable {
+  cursor: pointer;
+  transition: border-color 0.12s ease;
+}
+
+.kpi-card-expandable:hover {
+  border-color: #32CD32;
+}
+
+.kpi-card-expandable.is-expanded {
+  grid-column: 1 / -1;
+  border-color: #32CD32;
+}
+
+.kpi-card-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.kpi-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.kpi-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: #888;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.kpi-value-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.kpi-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #e8e8e8;
+  letter-spacing: -0.02em;
+}
+
+.kpi-unit {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  color: #555;
+  letter-spacing: 0.04em;
+}
+
+.kpi-expand-icon {
+  font-size: 0.65rem;
+  color: #555;
+  transition: color 0.12s ease;
+}
+
+.kpi-card-expandable:hover .kpi-expand-icon {
+  color: #32CD32;
+}
+
+.kpi-card-expandable.is-expanded .kpi-expand-icon {
+  color: #32CD32;
+}
+
+/* Growth Nebula Chart */
+.nebula-wrap {
+  width: 100%;
+}
+
+.nebula-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid #333333;
+  margin-top: 12px;
+}
+
+.nebula-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nebula-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #32CD32;
+  letter-spacing: 0.08em;
+}
+
+.nebula-desc {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  color: #555;
+  line-height: 1.5;
+}
+
+.nebula-chart-wrap {
+  width: 100%;
+  height: 280px;
+  border: 1px solid #333333;
+  background: #0e0e0e;
+  padding: 8px;
+}
+
+.nebula-chart-wrap svg {
+  display: block;
+}
+
+/* ============================================
+   FUNNEL PULSE — Live Terminal
+   ============================================ */
+
+.funnel-pulse {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 100%;
+  border: 1px solid #333333;
+  background: #141414;
+  flex-shrink: 0;
+}
+
+.funnel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid #333333;
+  background: #0e0e0e;
+}
+
+.funnel-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: #888;
+  letter-spacing: 0.1em;
+}
+
+.funnel-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #32CD32;
+  animation: blink-cursor 2s step-end infinite;
+}
+
+.funnel-feed {
+  display: flex;
+  flex-direction: column;
+  height: 180px;
+  overflow-y: hidden;
+  padding: 6px 0;
+}
+
+.funnel-event {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  line-height: 1.6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.funnel-ts {
+  color: #444;
+  flex-shrink: 0;
+}
+
+.funnel-type {
+  color: #32CD32;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.funnel-detail {
+  color: #888;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.funnel-amount {
+  color: #e8e8e8;
+  font-weight: 600;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.funnel-amount.funnel-neg {
+  color: #ff4444;
+}
+
