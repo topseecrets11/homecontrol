@@ -66,7 +66,16 @@
       monthlyNetProfit: 4200,
       targetMonthly: 15000,
       growthData: [1200, 1800, 2400, 3100, 3800, 4200, 5400, 6800, 8200, 10100, 11800, 13500]
-    }
+    },
+    products: [
+      { id: 'P1', name: 'Prompt Pack v2', price: 29.00, sales: 142, revenue: 4118 },
+      { id: 'P2', name: 'Niche Starter Guide', price: 49.00, sales: 85, revenue: 4165 }
+    ],
+    transactions: [
+      { tx: 'tx_98A2', time: '14:02', product: 'Prompt Pack v2', amount: 29.00, status: 'paid', source: 'Meta Ads', customer: 'usr_881' },
+      { tx: 'tx_98A3', time: '14:15', product: 'Niche Starter Guide', amount: 49.00, status: 'paid', source: 'Organic Email', customer: 'usr_224' },
+      { tx: 'tx_98A4', time: '14:45', product: 'Prompt Pack v2', amount: 29.00, status: 'abandoned', source: 'Meta Ads', customer: 'usr_993' }
+    ]
   };
 
   // ============================================
@@ -112,12 +121,11 @@
       _cache = deepCopy(DEFAULT_STATE);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(_cache));
     } else {
-      // Migrate: add arena data if missing
+      // Migrate: add missing fields
       var changed = false;
-      if (!state.arena) {
-        state.arena = deepCopy(DEFAULT_STATE.arena);
-        changed = true;
-      }
+      if (!state.arena) { state.arena = deepCopy(DEFAULT_STATE.arena); changed = true; }
+      if (!state.products) { state.products = deepCopy(DEFAULT_STATE.products); changed = true; }
+      if (!state.transactions) { state.transactions = deepCopy(DEFAULT_STATE.transactions); changed = true; }
       if (changed) {
         _cache = state;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -351,13 +359,14 @@
   }
 
   // ============================================
-  // THE ARENA \u2014 Sales Machine
+  // THE ARENA \u2014 Sales Machine (Sub-Routed)
   // ============================================
+  var _arenaSubView = 'overview';
+
   function mountArenaModule() {
     var state = getState();
     var arena = state.arena || DEFAULT_STATE.arena;
     var isReadOnly = isT3Active();
-    var isExpanded = false;
 
     // Header row
     var headerRow = h('div', { className: 'module-header-row' },
@@ -367,6 +376,53 @@
     if (isReadOnly) {
       headerRow.appendChild(h('span', { className: 'module-readonly-badge', 'data-testid': 'readonly-badge' }, 'READ-ONLY'));
     }
+
+    // Sub-navigation
+    var overviewTab = h('button', {
+      className: 'arena-tab active',
+      textContent: 'OVERVIEW',
+      'data-testid': 'arena-tab-overview'
+    });
+    var ledgerTab = h('button', {
+      className: 'arena-tab',
+      textContent: 'THE LEDGER',
+      'data-testid': 'arena-tab-ledger'
+    });
+    var subNav = h('div', { className: 'arena-subnav', 'data-testid': 'arena-subnav' }, overviewTab, ledgerTab);
+
+    // Content area
+    var contentArea = h('div', { className: 'arena-content-area', 'data-testid': 'arena-content-area' });
+
+    function switchSub(view) {
+      _arenaSubView = view;
+      cleanupArena();
+      while (contentArea.firstChild) contentArea.removeChild(contentArea.firstChild);
+      overviewTab.classList.toggle('active', view === 'overview');
+      ledgerTab.classList.toggle('active', view === 'ledger');
+      if (view === 'overview') {
+        contentArea.appendChild(mountArenaOverview(arena));
+      } else {
+        contentArea.appendChild(mountArenaLedger());
+      }
+    }
+
+    overviewTab.addEventListener('click', function() { switchSub('overview'); });
+    ledgerTab.addEventListener('click', function() { switchSub('ledger'); });
+
+    // Mount default sub-view
+    switchSub('overview');
+
+    return h('div', {
+      className: 'module-container arena-module',
+      'data-testid': 'module-arena'
+    }, headerRow, subNav, contentArea);
+  }
+
+  // ============================================
+  // ARENA: OVERVIEW Sub-View
+  // ============================================
+  function mountArenaOverview(arena) {
+    var isExpanded = false;
 
     // KPI Cards
     var card1 = createKPICard('LEAD VELOCITY', String(arena.leadVelocity), 'leads', 'lead-velocity');
@@ -386,7 +442,6 @@
       card4ValueEl
     );
 
-    // Growth Nebula (chart) - initially unmounted
     var nebulaContainer = h('div', { className: 'nebula-wrap', 'data-testid': 'growth-nebula-container' });
     nebulaContainer.style.maxHeight = '0';
     nebulaContainer.style.overflow = 'hidden';
@@ -400,7 +455,6 @@
         if (isExpanded) {
           card4El.classList.add('is-expanded');
           card4ExpandIcon.textContent = '\u25B2';
-          // Mount chart content
           if (!nebulaContainer.firstChild) {
             nebulaContainer.appendChild(createNebulaContent(arena));
           }
@@ -409,7 +463,6 @@
           card4El.classList.remove('is-expanded');
           card4ExpandIcon.textContent = '\u25BC';
           nebulaContainer.style.maxHeight = '0';
-          // Unmount chart after transition
           setTimeout(function() {
             if (!isExpanded) {
               while (nebulaContainer.firstChild) nebulaContainer.removeChild(nebulaContainer.firstChild);
@@ -419,14 +472,12 @@
       }
     }, card4Header, nebulaContainer);
 
-    // KPI Grid
     var kpiGrid = h('div', { className: 'arena-kpi-grid', 'data-testid': 'arena-kpi-grid' },
       card1, card2, card3, card4El
     );
 
     // Funnel Pulse
     var funnelFeed = h('div', { className: 'funnel-feed', 'data-testid': 'funnel-feed' });
-    // Seed initial events
     for (var i = 0; i < 5; i++) {
       funnelFeed.appendChild(createFunnelEvent());
     }
@@ -439,7 +490,6 @@
       funnelFeed
     );
 
-    // Start funnel interval
     _funnelInterval = setInterval(function() {
       var newEvent = createFunnelEvent();
       if (funnelFeed.firstChild) {
@@ -447,17 +497,154 @@
       } else {
         funnelFeed.appendChild(newEvent);
       }
-      // Keep max 10 events
       while (funnelFeed.children.length > 10) {
         funnelFeed.removeChild(funnelFeed.lastChild);
       }
     }, 6000);
 
-    // Container
-    return h('div', {
-      className: 'module-container arena-module',
-      'data-testid': 'module-arena'
-    }, headerRow, kpiGrid, funnelPulse);
+    return h('div', { className: 'arena-overview', 'data-testid': 'arena-overview' }, kpiGrid, funnelPulse);
+  }
+
+  // ============================================
+  // ARENA: THE LEDGER Sub-View
+  // ============================================
+  function mountArenaLedger() {
+    var state = getState();
+    var products = state.products || DEFAULT_STATE.products;
+    var transactions = state.transactions || DEFAULT_STATE.transactions;
+    var viewMode = 'simple'; // 'simple' or 'detailed'
+
+    // View toggle
+    var simpleBtn = h('button', {
+      className: 'ledger-view-btn active',
+      textContent: 'SIMPLE',
+      'data-testid': 'ledger-view-simple'
+    });
+    var detailedBtn = h('button', {
+      className: 'ledger-view-btn',
+      textContent: 'DETAILED',
+      'data-testid': 'ledger-view-detailed'
+    });
+
+    var viewToggle = h('div', { className: 'ledger-view-toggle', 'data-testid': 'ledger-view-toggle' },
+      h('span', { className: 'ledger-view-label', textContent: 'VIEW:' }),
+      simpleBtn,
+      detailedBtn
+    );
+
+    // Transactions table container (re-rendered on toggle)
+    var txTableWrap = h('div', { className: 'ledger-tx-wrap', 'data-testid': 'ledger-tx-wrap' });
+
+    function renderTxTable() {
+      while (txTableWrap.firstChild) txTableWrap.removeChild(txTableWrap.firstChild);
+      txTableWrap.appendChild(buildTransactionsTable(transactions, viewMode));
+    }
+
+    simpleBtn.addEventListener('click', function() {
+      if (viewMode === 'simple') return;
+      viewMode = 'simple';
+      simpleBtn.classList.add('active');
+      detailedBtn.classList.remove('active');
+      renderTxTable();
+    });
+    detailedBtn.addEventListener('click', function() {
+      if (viewMode === 'detailed') return;
+      viewMode = 'detailed';
+      detailedBtn.classList.add('active');
+      simpleBtn.classList.remove('active');
+      renderTxTable();
+    });
+
+    // Products table
+    var productsCol = h('div', { className: 'ledger-col ledger-col-products', 'data-testid': 'ledger-products-col' },
+      h('h3', { className: 'ledger-col-title', textContent: 'PRODUCTS' }),
+      buildProductsTable(products)
+    );
+
+    // Transactions column
+    var txCol = h('div', { className: 'ledger-col ledger-col-tx', 'data-testid': 'ledger-tx-col' },
+      h('div', { className: 'ledger-col-header' },
+        h('h3', { className: 'ledger-col-title', textContent: 'TRANSACTIONS' }),
+        viewToggle
+      ),
+      txTableWrap
+    );
+
+    // Initial render
+    renderTxTable();
+
+    return h('div', { className: 'arena-ledger', 'data-testid': 'arena-ledger' }, productsCol, txCol);
+  }
+
+  // ============================================
+  // LEDGER: Products Table
+  // ============================================
+  function buildProductsTable(products) {
+    var thead = h('thead', null,
+      h('tr', null,
+        h('th', { textContent: 'ID' }),
+        h('th', { textContent: 'NAME' }),
+        h('th', { className: 'num-col', textContent: 'SALES' }),
+        h('th', { className: 'num-col', textContent: 'REV' })
+      )
+    );
+    var tbody = h('tbody');
+    for (var i = 0; i < products.length; i++) {
+      var p = products[i];
+      tbody.appendChild(h('tr', { 'data-testid': 'product-row-' + p.id },
+        h('td', { className: 'td-id', textContent: p.id }),
+        h('td', { textContent: p.name }),
+        h('td', { className: 'num-col', textContent: String(p.sales) }),
+        h('td', { className: 'num-col', textContent: '$' + p.revenue.toLocaleString() })
+      ));
+    }
+    return h('table', { className: 'ledger-table', 'data-testid': 'products-table' }, thead, tbody);
+  }
+
+  // ============================================
+  // LEDGER: Transactions Table
+  // ============================================
+  function buildTransactionsTable(transactions, mode) {
+    var isDetailed = mode === 'detailed';
+    var headerCells;
+    if (isDetailed) {
+      headerCells = ['TX', 'TIME', 'PRODUCT', 'AMT', 'SOURCE', 'CUSTOMER'];
+    } else {
+      headerCells = ['TX', 'TIME', 'PRODUCT', 'STATUS'];
+    }
+
+    var tr = h('tr');
+    for (var c = 0; c < headerCells.length; c++) {
+      var isNum = headerCells[c] === 'AMT';
+      tr.appendChild(h('th', { className: isNum ? 'num-col' : '', textContent: headerCells[c] }));
+    }
+    var thead = h('thead', null, tr);
+
+    var tbody = h('tbody');
+    for (var i = 0; i < transactions.length; i++) {
+      var t = transactions[i];
+      var row = h('tr', { 'data-testid': 'tx-row-' + t.tx });
+      if (isDetailed) {
+        row.appendChild(h('td', { className: 'td-id', textContent: t.tx }));
+        row.appendChild(h('td', { textContent: t.time }));
+        row.appendChild(h('td', { textContent: t.product }));
+        row.appendChild(h('td', { className: 'num-col', textContent: '$' + t.amount.toFixed(2) }));
+        row.appendChild(h('td', { textContent: t.source }));
+        row.appendChild(h('td', { className: 'td-id', textContent: t.customer }));
+      } else {
+        row.appendChild(h('td', { className: 'td-id', textContent: t.tx }));
+        row.appendChild(h('td', { textContent: t.time }));
+        row.appendChild(h('td', { textContent: t.product }));
+        var statusEl = h('td', {
+          className: t.status === 'paid' ? 'status-paid' : 'status-abandoned',
+          textContent: t.status.toUpperCase()
+        });
+        row.appendChild(statusEl);
+      }
+      tbody.appendChild(row);
+    }
+
+    return h('table', { className: 'ledger-table', 'data-testid': 'transactions-table' }, thead, tbody);
   }
 
   // ============================================

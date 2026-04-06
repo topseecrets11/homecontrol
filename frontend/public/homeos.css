@@ -1099,3 +1099,226 @@ input[type="range"].wb-range::-moz-range-track {
   color: #ff4444;
 }
 
+
+/* ============================================
+   ARENA SUB-NAVIGATION
+   ============================================ */
+
+.arena-subnav {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border-bottom: 1px solid #333333;
+  margin-bottom: 16px;
+}
+
+.arena-tab {
+  padding: 8px 20px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #555;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: color 0.12s ease, border-color 0.12s ease;
+  outline: none;
+}
+
+.arena-tab:hover {
+  color: #999;
+}
+
+.arena-tab.active {
+  color: #32CD32;
+  border-bottom-color: #32CD32;
+}
+
+.arena-content-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: auto;
+}
+
+.arena-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+}
+
+/* ============================================
+   THE LEDGER
+   ============================================ */
+
+.arena-ledger {
+  display: flex;
+  gap: 2px;
+  flex: 1;
+  min-height: 0;
+}
+
+.ledger-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: auto;
+}
+
+.ledger-col-products {
+  flex: 0 0 38%;
+  min-width: 0;
+}
+
+.ledger-col-tx {
+  flex: 1;
+  min-width: 0;
+}
+
+.ledger-col-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #888;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 10px 14px;
+  background: #0e0e0e;
+  border-bottom: 1px solid #333333;
+}
+
+.ledger-col-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #0e0e0e;
+  border-bottom: 1px solid #333333;
+}
+
+.ledger-col-header .ledger-col-title {
+  border-bottom: none;
+}
+
+/* View Toggle */
+.ledger-view-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding-right: 10px;
+}
+
+.ledger-view-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.58rem;
+  color: #555;
+  letter-spacing: 0.06em;
+  margin-right: 8px;
+}
+
+.ledger-view-btn {
+  padding: 4px 12px;
+  background: transparent;
+  border: 1px solid #333333;
+  border-right: none;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.58rem;
+  font-weight: 600;
+  color: #555;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: color 0.12s ease, background-color 0.12s ease;
+  outline: none;
+}
+
+.ledger-view-btn:last-child {
+  border-right: 1px solid #333333;
+}
+
+.ledger-view-btn:hover {
+  color: #999;
+}
+
+.ledger-view-btn.active {
+  background: #1a1a1a;
+  color: #32CD32;
+  border-color: #32CD32;
+}
+
+.ledger-view-btn.active + .ledger-view-btn {
+  border-left-color: #32CD32;
+}
+
+.ledger-tx-wrap {
+  flex: 1;
+  overflow: auto;
+}
+
+/* ============================================
+   LEDGER TABLES
+   ============================================ */
+
+.ledger-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #141414;
+}
+
+.ledger-table th {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.55rem;
+  font-weight: 600;
+  color: #666;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-align: left;
+  padding: 8px 14px;
+  border-bottom: 1px solid #333333;
+  white-space: nowrap;
+}
+
+.ledger-table th.num-col {
+  text-align: right;
+}
+
+.ledger-table td {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  color: #c0c0c0;
+  padding: 7px 14px;
+  border-bottom: 1px solid #222222;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ledger-table td.num-col {
+  text-align: right;
+  color: #e0e0e0;
+  font-weight: 600;
+}
+
+.ledger-table td.td-id {
+  color: #555;
+  font-size: 0.62rem;
+}
+
+.ledger-table tbody tr:hover td {
+  background: #1a1a1a;
+}
+
+/* Status indicators */
+.status-paid {
+  color: #32CD32 !important;
+  font-weight: 600;
+}
+
+.status-abandoned {
+  color: #555555 !important;
+}
+
