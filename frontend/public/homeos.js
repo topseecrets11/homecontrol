@@ -59,6 +59,7 @@
     resilience: { t1: false, t2: false, t3: false, lockoutUntil: null, t3TimeLimit: 60 },
     wellbeing: { lastCheckIn: null, recovery: 5, vitality: 5, temper: 5 },
     lastActivity: Date.now(),
+    activeTheme: '#32CD32',
     arena: {
       leadVelocity: 42,
       conversionEfficiency: 2.4,
@@ -138,6 +139,7 @@
       if (!state.products) { state.products = deepCopy(DEFAULT_STATE.products); changed = true; }
       if (!state.transactions) { state.transactions = deepCopy(DEFAULT_STATE.transactions); changed = true; }
       if (!state.environment) { state.environment = deepCopy(DEFAULT_STATE.environment); changed = true; }
+      if (!state.activeTheme) { state.activeTheme = '#32CD32'; changed = true; }
       if (changed) {
         _cache = state;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -192,6 +194,36 @@
   function removeById(id) {
     var el = document.getElementById(id);
     if (el) el.parentNode.removeChild(el);
+  }
+
+  // ============================================
+  // THEME ENGINE
+  // ============================================
+  var THEME_OPTIONS = [
+    { name: 'Neon Green', hex: '#32CD32' },
+    { name: 'Neon Orange', hex: '#FF5E00' },
+    { name: 'Royal Blue', hex: '#4169E1' }
+  ];
+
+  function hexToDim(hex) {
+    var r = parseInt(hex.slice(1, 3), 16);
+    var g = parseInt(hex.slice(3, 5), 16);
+    var b = parseInt(hex.slice(5, 7), 16);
+    r = Math.round(r * 0.12);
+    g = Math.round(g * 0.12);
+    b = Math.round(b * 0.12);
+    return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+  }
+
+  function getAccent() {
+    var state = getState();
+    return (state && state.activeTheme) ? state.activeTheme : '#32CD32';
+  }
+
+  function applyTheme(hex) {
+    var root = document.documentElement;
+    root.style.setProperty('--theme-accent', hex);
+    root.style.setProperty('--theme-accent-dim', hexToDim(hex));
   }
 
   // ============================================
@@ -277,7 +309,7 @@
       modeDot.style.background = '#ffcc00';
     } else {
       modeText.textContent = 'OPERATIONAL MODE';
-      modeDot.style.background = '#32CD32';
+      modeDot.style.background = getAccent();
     }
   }
 
@@ -1211,13 +1243,51 @@
       }
     }
 
+    // Theme section
+    var currentTheme = state.activeTheme || '#32CD32';
+    var swatchesRow = h('div', { className: 'theme-swatches', 'data-testid': 'theme-swatches' });
+    for (var ti = 0; ti < THEME_OPTIONS.length; ti++) {
+      (function(theme) {
+        var isActive = currentTheme === theme.hex;
+        var swatch = h('button', {
+          className: 'theme-swatch' + (isActive ? ' active-swatch' : ''),
+          title: theme.name,
+          'data-testid': 'theme-swatch-' + theme.name.replace(/\s/g, '-').toLowerCase(),
+          style: { background: theme.hex },
+          onClick: function() {
+            setState({ activeTheme: theme.hex });
+            applyTheme(theme.hex);
+            // Update swatch active states
+            var all = swatchesRow.querySelectorAll('.theme-swatch');
+            for (var a = 0; a < all.length; a++) all[a].classList.remove('active-swatch');
+            swatch.classList.add('active-swatch');
+            labelEl.textContent = theme.name;
+            updateModeIndicator();
+          }
+        });
+        swatchesRow.appendChild(swatch);
+      })(THEME_OPTIONS[ti]);
+    }
+    var activeName = '';
+    for (var tn = 0; tn < THEME_OPTIONS.length; tn++) {
+      if (THEME_OPTIONS[tn].hex === currentTheme) activeName = THEME_OPTIONS[tn].name;
+    }
+    var labelEl = h('span', { className: 'theme-swatch-label', 'data-testid': 'theme-active-label' }, activeName);
+    swatchesRow.appendChild(labelEl);
+
+    var themeSection = h('div', { className: 'theme-section', 'data-testid': 'theme-section' },
+      h('span', { className: 'theme-section-title', textContent: 'ENVIRONMENT THEME' }),
+      swatchesRow
+    );
+
     var panel = h('div', {
       id: 'settings-panel', className: 'fullscreen-overlay', 'data-testid': 'settings-panel'
     },
       h('div', { className: 'settings-container' },
-        h('h1', { className: 'settings-title', textContent: 'LOCKOUT PROTOCOL' }),
-        h('p', { className: 'settings-subtitle', textContent: 'Configure resilience triggers' }),
+        h('h1', { className: 'settings-title', textContent: 'SETTINGS' }),
+        h('p', { className: 'settings-subtitle', textContent: 'Lockout Protocol & Environment' }),
         rows,
+        themeSection,
         h('div', { className: 'settings-actions' },
           h('button', { className: 'settings-action-btn', textContent: 'WELLBEING CHECK-IN',
             'data-testid': 'manual-checkin-btn', onClick: function() { removeById('settings-panel'); mountWellbeingOverlay(); } }),
@@ -1299,6 +1369,8 @@
   // ============================================
   function init() {
     initState();
+    // Apply saved theme immediately
+    applyTheme(getAccent());
     checkOrientation();
     window.addEventListener('resize', checkOrientation);
     updateClock();
