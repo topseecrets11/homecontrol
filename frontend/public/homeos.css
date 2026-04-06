@@ -1322,3 +1322,318 @@ input[type="range"].wb-range::-moz-range-track {
   color: #555555 !important;
 }
 
+
+/* ============================================
+   THE NODE — Physical Environment & Sentry
+   ============================================ */
+
+.node-module {
+  gap: 12px;
+}
+
+.node-grid {
+  display: grid;
+  grid-template-columns: 25% 40% 35%;
+  gap: 2px;
+  flex: 1;
+  min-height: 0;
+}
+
+.node-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: auto;
+  min-width: 0;
+}
+
+.node-section-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: #666;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 8px 14px;
+  background: #0e0e0e;
+  border-bottom: 1px solid #333333;
+}
+
+.node-section-gap {
+  margin-top: 2px;
+}
+
+/* === CLIMATE === */
+.climate-card {
+  background: #141414;
+  border: 1px solid #333333;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.climate-location {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #888;
+  letter-spacing: 0.06em;
+}
+
+.climate-row {
+  display: flex;
+  gap: 20px;
+}
+
+.climate-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.climate-metric-full {
+  width: 100%;
+}
+
+.climate-label {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.5rem;
+  font-weight: 600;
+  color: #555;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.climate-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #d0d0d0;
+  letter-spacing: -0.02em;
+}
+
+.climate-val-accent {
+  color: #32CD32;
+}
+
+/* === GENIO MATRIX === */
+.genio-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+}
+
+.genio-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  background: #141414;
+  border: 1px solid #333333;
+  cursor: pointer;
+  transition: border-color 0.12s ease;
+}
+
+.genio-card:hover {
+  border-color: #444;
+}
+
+.genio-card-on {
+  border-color: #32CD32;
+}
+
+.genio-card-on:hover {
+  border-color: #32CD32;
+}
+
+.genio-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.genio-icon {
+  font-size: 1.1rem;
+  color: #555;
+  line-height: 1;
+}
+
+.genio-card-on .genio-icon {
+  color: #32CD32;
+}
+
+.genio-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #333;
+}
+
+.genio-dot-on {
+  background: #32CD32;
+}
+
+.genio-name {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #888;
+  letter-spacing: 0.02em;
+}
+
+.genio-card-on .genio-name {
+  color: #d0d0d0;
+}
+
+.genio-card-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.genio-type {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.55rem;
+  color: #444;
+  letter-spacing: 0.08em;
+}
+
+.genio-state {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.genio-on {
+  color: #32CD32;
+}
+
+.genio-off {
+  color: #555;
+}
+
+/* === SENTRY SYSTEM === */
+.sentry-card {
+  background: #141414;
+  border: 1px solid #333333;
+  padding: 18px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sentry-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sentry-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.sentry-standby {
+  background: #ffcc00;
+}
+
+.sentry-status-text {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #ffcc00;
+  letter-spacing: 0.08em;
+}
+
+.sentry-name {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #d0d0d0;
+  letter-spacing: 0.03em;
+}
+
+.sentry-details {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sentry-detail-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.sentry-detail-label {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.5rem;
+  font-weight: 600;
+  color: #555;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sentry-detail-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  color: #c0c0c0;
+  letter-spacing: 0.02em;
+}
+
+.sentry-batt-ok {
+  color: #32CD32;
+  font-weight: 600;
+}
+
+.sentry-batt-low {
+  color: #ff4444;
+  font-weight: 600;
+}
+
+.sentry-wake-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  padding: 14px 16px;
+  background: #0e0e0e;
+  border: 1px solid #333333;
+  color: #888;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: border-color 0.12s ease, color 0.12s ease;
+  text-transform: uppercase;
+  margin-top: auto;
+}
+
+.sentry-wake-btn:hover {
+  border-color: #32CD32;
+  color: #32CD32;
+}
+
+.sentry-connecting {
+  border-color: #ffcc00;
+  color: #ffcc00;
+  cursor: default;
+}
+
+.sentry-connecting:hover {
+  border-color: #ffcc00;
+  color: #ffcc00;
+}
+
+.wake-cursor {
+  width: 6px;
+  height: 12px;
+  background: #ffcc00;
+}
+

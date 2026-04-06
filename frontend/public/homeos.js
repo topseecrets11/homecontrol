@@ -75,7 +75,18 @@
       { tx: 'tx_98A2', time: '14:02', product: 'Prompt Pack v2', amount: 29.00, status: 'paid', source: 'Meta Ads', customer: 'usr_881' },
       { tx: 'tx_98A3', time: '14:15', product: 'Niche Starter Guide', amount: 49.00, status: 'paid', source: 'Organic Email', customer: 'usr_224' },
       { tx: 'tx_98A4', time: '14:45', product: 'Prompt Pack v2', amount: 29.00, status: 'abandoned', source: 'Meta Ads', customer: 'usr_993' }
-    ]
+    ],
+    environment: {
+      climate: { location: 'Strathdale, VIC', tempOut: 22, tempIn: 24, humidity: 45 },
+      devices: [
+        { id: 'g1', name: 'Genio Main Light', type: 'light', state: 'on' },
+        { id: 'g2', name: 'Genio Desk Light', type: 'light', state: 'off' },
+        { id: 'g3', name: 'Genio Powerboard (Bench)', type: 'power', state: 'on' }
+      ],
+      sentry: [
+        { id: 'cam1', name: 'UNIDEN SOLO PRO - FRONT', status: 'standby', battery: '84%', lastEvent: '14:02 - Motion Detected' }
+      ]
+    }
   };
 
   // ============================================
@@ -126,6 +137,7 @@
       if (!state.arena) { state.arena = deepCopy(DEFAULT_STATE.arena); changed = true; }
       if (!state.products) { state.products = deepCopy(DEFAULT_STATE.products); changed = true; }
       if (!state.transactions) { state.transactions = deepCopy(DEFAULT_STATE.transactions); changed = true; }
+      if (!state.environment) { state.environment = deepCopy(DEFAULT_STATE.environment); changed = true; }
       if (changed) {
         _cache = state;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -298,6 +310,18 @@
   }
 
   // ============================================
+  // NODE MODULE \u2014 Cleanup
+  // ============================================
+  var _sentryTimeout = null;
+
+  function cleanupNode() {
+    if (_sentryTimeout) {
+      clearTimeout(_sentryTimeout);
+      _sentryTimeout = null;
+    }
+  }
+
+  // ============================================
   // MODULE ROUTER \u2014 Full mount/unmount
   // ============================================
   function navigateTo(moduleName) {
@@ -306,6 +330,7 @@
 
     // Cleanup previous module
     cleanupArena();
+    cleanupNode();
 
     // Remove any lockout overlay
     removeById('arena-lockout-overlay');
@@ -328,6 +353,8 @@
     // MOUNT: module-specific content
     if (moduleName === 'ARENA') {
       viewport.appendChild(mountArenaModule());
+    } else if (moduleName === 'NODE') {
+      viewport.appendChild(mountNodeModule());
     } else {
       viewport.appendChild(mountGenericModule(moduleName));
     }
@@ -338,6 +365,172 @@
     updateVirgil(moduleName);
     updateModeIndicator();
   }
+
+
+  // ============================================
+  // THE NODE — Physical Environment & Sentry
+  // ============================================
+  function mountNodeModule() {
+    var state = getState();
+    var env = state.environment || deepCopy(DEFAULT_STATE.environment);
+    var climate = env.climate;
+    var devices = env.devices;
+    var sentry = env.sentry;
+
+    // Header
+    var headerRow = h('div', { className: 'module-header-row' },
+      h('h1', { className: 'module-title', textContent: 'THE NODE' }),
+      h('span', { className: 'module-subtitle', textContent: '(Physical Environment & Sentry)' })
+    );
+
+    // === LEFT COLUMN: Climate ===
+    var climateCol = h('div', { className: 'node-col node-col-climate', 'data-testid': 'node-climate-col' },
+      h('div', { className: 'node-section-title' }, 'CLIMATE'),
+      h('div', { className: 'climate-card' },
+        h('div', { className: 'climate-location', 'data-testid': 'climate-location' }, climate.location),
+        h('div', { className: 'climate-row' },
+          h('div', { className: 'climate-metric' },
+            h('span', { className: 'climate-label' }, 'OUTSIDE'),
+            h('span', { className: 'climate-val', 'data-testid': 'climate-temp-out' }, climate.tempOut + '\u00B0C')
+          ),
+          h('div', { className: 'climate-metric' },
+            h('span', { className: 'climate-label' }, 'INSIDE'),
+            h('span', { className: 'climate-val climate-val-accent', 'data-testid': 'climate-temp-in' }, climate.tempIn + '\u00B0C')
+          )
+        ),
+        h('div', { className: 'climate-metric climate-metric-full' },
+          h('span', { className: 'climate-label' }, 'HUMIDITY'),
+          h('span', { className: 'climate-val', 'data-testid': 'climate-humidity' }, climate.humidity + '%')
+        )
+      ),
+      h('div', { className: 'node-section-title node-section-gap' }, 'NETWORK'),
+      h('div', { className: 'climate-card' },
+        h('div', { className: 'climate-metric climate-metric-full' },
+          h('span', { className: 'climate-label' }, 'STATUS'),
+          h('span', { className: 'climate-val climate-val-accent', 'data-testid': 'network-status' }, 'ONLINE')
+        ),
+        h('div', { className: 'climate-metric climate-metric-full' },
+          h('span', { className: 'climate-label' }, 'LATENCY'),
+          h('span', { className: 'climate-val', 'data-testid': 'network-latency' }, '12ms')
+        )
+      )
+    );
+
+    // === CENTER COLUMN: Genio Matrix ===
+    var matrixGrid = h('div', { className: 'genio-grid', 'data-testid': 'genio-device-grid' });
+
+    for (var i = 0; i < devices.length; i++) {
+      (function(idx) {
+        var dev = devices[idx];
+        var isOn = dev.state === 'on';
+
+        var stateLabel = h('span', {
+          className: 'genio-state ' + (isOn ? 'genio-on' : 'genio-off'),
+          'data-testid': 'genio-state-' + dev.id
+        }, isOn ? 'ON' : 'OFF');
+
+        var dot = h('span', { className: 'genio-dot ' + (isOn ? 'genio-dot-on' : '') });
+
+        var typeIcon = dev.type === 'light' ? '\u2600' : '\u26A1';
+
+        var card = h('div', {
+          className: 'genio-card ' + (isOn ? 'genio-card-on' : ''),
+          'data-testid': 'genio-card-' + dev.id,
+          onClick: function() {
+            var s = getState();
+            var envCopy = deepCopy(s.environment);
+            var d = envCopy.devices[idx];
+            d.state = d.state === 'on' ? 'off' : 'on';
+            setState({ environment: envCopy });
+
+            // Update DOM
+            var nowOn = d.state === 'on';
+            card.classList.toggle('genio-card-on', nowOn);
+            stateLabel.className = 'genio-state ' + (nowOn ? 'genio-on' : 'genio-off');
+            stateLabel.textContent = nowOn ? 'ON' : 'OFF';
+            dot.className = 'genio-dot ' + (nowOn ? 'genio-dot-on' : '');
+          }
+        },
+          h('div', { className: 'genio-card-top' },
+            h('span', { className: 'genio-icon' }, typeIcon),
+            dot
+          ),
+          h('div', { className: 'genio-name', 'data-testid': 'genio-name-' + dev.id }, dev.name),
+          h('div', { className: 'genio-card-bottom' },
+            h('span', { className: 'genio-type' }, dev.type.toUpperCase()),
+            stateLabel
+          )
+        );
+        matrixGrid.appendChild(card);
+      })(i);
+    }
+
+    var matrixCol = h('div', { className: 'node-col node-col-matrix', 'data-testid': 'node-matrix-col' },
+      h('div', { className: 'node-section-title' }, 'GENIO MATRIX'),
+      matrixGrid
+    );
+
+    // === RIGHT COLUMN: Sentry ===
+    var cam = sentry[0];
+    var battNum = parseInt(cam.battery, 10);
+    var battOk = battNum > 20;
+
+    var wakeBtnText = h('span', { 'data-testid': 'wake-btn-text' }, '[ WAKE FEED ]');
+    var wakeCursor = h('span', { className: 'ai-cursor wake-cursor', style: { display: 'none' } });
+
+    var wakeBtn = h('button', {
+      className: 'sentry-wake-btn',
+      'data-testid': 'sentry-wake-btn',
+      onClick: function() {
+        if (_sentryTimeout) return; // Already connecting
+        wakeBtnText.textContent = 'CONNECTING TO RTSP...';
+        wakeCursor.style.display = 'inline-block';
+        wakeBtn.classList.add('sentry-connecting');
+        _sentryTimeout = setTimeout(function() {
+          wakeBtnText.textContent = '[ WAKE FEED ]';
+          wakeCursor.style.display = 'none';
+          wakeBtn.classList.remove('sentry-connecting');
+          _sentryTimeout = null;
+        }, 3000);
+      }
+    }, wakeBtnText, wakeCursor);
+
+    var sentryCol = h('div', { className: 'node-col node-col-sentry', 'data-testid': 'node-sentry-col' },
+      h('div', { className: 'node-section-title' }, 'SENTRY SYSTEM'),
+      h('div', { className: 'sentry-card', 'data-testid': 'sentry-card-' + cam.id },
+        h('div', { className: 'sentry-status-row' },
+          h('span', { className: 'sentry-status-dot sentry-standby' }),
+          h('span', { className: 'sentry-status-text', 'data-testid': 'sentry-status' }, cam.status.toUpperCase())
+        ),
+        h('div', { className: 'sentry-name', 'data-testid': 'sentry-cam-name' }, cam.name),
+        h('div', { className: 'sentry-details' },
+          h('div', { className: 'sentry-detail-row' },
+            h('span', { className: 'sentry-detail-label' }, 'BATTERY'),
+            h('span', {
+              className: 'sentry-detail-val ' + (battOk ? 'sentry-batt-ok' : 'sentry-batt-low'),
+              'data-testid': 'sentry-battery'
+            }, cam.battery)
+          ),
+          h('div', { className: 'sentry-detail-row' },
+            h('span', { className: 'sentry-detail-label' }, 'LAST EVENT'),
+            h('span', { className: 'sentry-detail-val', 'data-testid': 'sentry-last-event' }, cam.lastEvent)
+          )
+        ),
+        wakeBtn
+      )
+    );
+
+    // 3-column grid
+    var nodeGrid = h('div', { className: 'node-grid', 'data-testid': 'node-grid' },
+      climateCol, matrixCol, sentryCol
+    );
+
+    return h('div', {
+      className: 'module-container node-module',
+      'data-testid': 'module-node'
+    }, headerRow, nodeGrid);
+  }
+
 
   // ============================================
   // GENERIC MODULE (placeholder)
