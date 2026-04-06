@@ -911,7 +911,7 @@ input[type="range"].wb-range::-moz-range-track {
 .arena-kpi-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 20px;
+  gap: var(--os-gap);
   width: 100%;
 }
 
