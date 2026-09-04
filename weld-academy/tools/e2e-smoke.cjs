@@ -654,6 +654,78 @@ function check(name, cond, extra) {
     drive.credited === drive.lessons, drive);
   check('finishing clears the resume point', drive.resumeCleared, drive);
 
+  /* ---------- the collection, and the bits from Mick ---------- */
+  await page.goto(APP + '#/dolls');
+  await page.waitForSelector('.doll-cell');
+  await dismiss(page);
+  check('the whole set is shown, earned or not',
+    (await page.locator('.doll-cell').count()) === await page.evaluate(() => WA_DOLLS.dolls.length));
+  check('unearned ones are silhouettes with no name given', await page.evaluate(() => {
+    const locked = [...document.querySelectorAll('.doll-cell.is-locked')];
+    return locked.length > 0 && locked.every(c => c.querySelector('.doll-name').textContent === '???');
+  }));
+  check('every doll can actually be earned by something', await page.evaluate(() =>
+    WA_DOLLS.dolls.every(d => {
+      const [kind, arg] = d.how.split(':');
+      if (kind === 'module') return WA_CONTENT.modules.some(m => m.id === arg);
+      return ['streak', 'drills', 'badges'].includes(kind) && Number(arg) > 0;
+    })));
+  check('there is always a next one to want', await page.evaluate(() => {
+    const n = WA_DOLLS.nextUp();
+    return n && n.hint.length > 3;
+  }));
+  check('it is honest about being a collection, not a game',
+    /not a game to play/i.test(await page.textContent('#view')));
+
+  // Finishing the first unit is what unlocks the first doll.
+  check('finishing a unit unlocks its doll', await page.evaluate(() => {
+    WA_PROGRESS.setSetting('dolls', []);
+    const mod = WA_CONTENT.modules.find(m => m.id === 'safety');
+    mod.lessons.forEach(l => { WA_PROGRESS.state.lessons[l.id] = true; });
+    const fresh = WA_DOLLS.check();
+    return fresh.some(d => d.id === 'arc') && WA_DOLLS.has('arc');
+  }));
+  check('and it only unlocks once', await page.evaluate(() => WA_DOLLS.check().length === 0));
+  await page.goto(APP + '#/dolls');
+  await page.waitForSelector('.doll-cell');
+  await dismiss(page);
+  await shot(page, '25-dolls.png');
+
+  // The personal bits: hooks with placeholder content, all in one file.
+  check('the unicorn is on the last tile of the first unit only', await page.evaluate(() => {
+    const m = WA_CONTENT.modules.find(x => x.id === 'safety');
+    const last = m.lessons[m.lessons.length - 1].id;
+    const first = m.lessons[0].id;
+    return WA_PERSONAL.isUnicornLesson('safety', last) &&
+      !WA_PERSONAL.isUnicornLesson('safety', first) &&
+      !WA_PERSONAL.isUnicornLesson('smaw', last);
+  }));
+  check('the hidden note needs a deliberate long press, not a tap', await page.evaluate(() =>
+    WA_PERSONAL.HOLD_MS >= 500 && WA_PERSONAL.HOLDS_NEEDED >= 3));
+
+  // It must be findable, so the press-and-hold is exercised for real.
+  await page.goto(APP + '#/home');
+  await page.waitForSelector('#heroHi');
+  await dismiss(page);
+  const box = await page.locator('#heroHi').boundingBox();
+  for (let i = 0; i < 3; i++) {
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.waitForTimeout(820);
+    await page.mouse.up();
+    await page.waitForTimeout(60);
+  }
+  await page.waitForSelector('.note', { timeout: 3000 }).catch(() => {});
+  check('three long presses on her name open the note',
+    (await page.locator('.note').count()) === 1);
+  check('the note leaves no trace in saved progress', await page.evaluate(() =>
+    !JSON.stringify(WA_PROGRESS.state).toLowerCase().includes('unicorn') &&
+    WA_PROGRESS.settings().note === undefined));
+  await shot(page, '26-note.png');
+  await page.click('.note-x');
+  await page.waitForTimeout(320);
+  check('and it closes cleanly', (await page.locator('.note').count()) === 0);
+
   /* ---------- where this comes from ---------- */
   await page.goto(APP + '#/sources');
   await page.waitForSelector('.src');

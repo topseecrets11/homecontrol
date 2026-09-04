@@ -263,17 +263,27 @@ window.WA_PROGRESS = (function () {
   function completeLesson(moduleId, lessonId) {
     var before = level();
     var gained = 0;
+    var finishedModule = null;
     if (!state.lessons[lessonId]) {
+      var wasComplete = moduleComplete(moduleId);
       state.lessons[lessonId] = true;
       gained += XP.lesson;
       state.xp += XP.lesson;
-      if (moduleComplete(moduleId)) {
+      // Only the lesson that tips the unit over counts as finishing it, so the
+      // celebration fires once rather than on every revisit.
+      if (!wasComplete && moduleComplete(moduleId)) {
+        finishedModule = moduleId;
         gained += XP.moduleComplete;
         state.xp += XP.moduleComplete;
       }
       save();
     }
-    return { xp: gained, newBadges: checkBadges(), levelUp: level() > before };
+    return {
+      xp: gained,
+      newBadges: checkBadges(),
+      levelUp: level() > before,
+      moduleComplete: finishedModule
+    };
   }
 
   // XP only for the first sitting; retakes are free practice.

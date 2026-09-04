@@ -12,7 +12,7 @@ const root = join(here, '..');
 const sandbox = { window: {} };
 for (const file of ['js/content.js', 'js/reference.js', 'js/diagrams.js',
                     'js/practice.js', 'js/content-mastery.js', 'js/content-salvage.js', 'js/script.js',
-                    'js/sources.js',
+                    'js/sources.js', 'js/dolls.js',
                     'js/teardown.js']) {
   const src = readFileSync(join(root, file), 'utf8');
   new Function('window', src)(sandbox.window);
@@ -26,6 +26,7 @@ const DMAP = sandbox.window.WA_DIAGRAM_MAP;
 const SC = sandbox.window.WA_SCRIPT;
 const TD = sandbox.window.WA_TEARDOWN;
 const SRC = sandbox.window.WA_SOURCES;
+const DL = sandbox.window.WA_DOLLS;
 
 const errors = [];
 const fail = (msg) => errors.push(msg);
@@ -253,6 +254,34 @@ for (const k of SRC?.kinds() ?? []) {
   if (!SRC.sources.some((s) => s.kind === k.id)) fail(`Source kind "${k.id}" has no entries`);
 }
 
+/* ---- the collection: every doll must be reachable ---- */
+
+const sizes = new Set();
+for (const d of DL?.dolls ?? []) {
+  if (sizes.has(d.size)) fail(`Two dolls share size ${d.size}`);
+  sizes.add(d.size);
+  if (!d.name || !d.hint) fail(`Doll "${d.id}" is missing a name or a hint`);
+  for (const c of ['body', 'shawl', 'face', 'flower']) {
+    if (!/^#[0-9a-f]{6}$/i.test(d[c] || '')) fail(`Doll "${d.id}" has no ${c} colour`);
+  }
+  // An unlock condition nothing can satisfy means a doll nobody ever gets.
+  const [kind, arg] = d.how.split(':');
+  if (kind === 'module') {
+    if (!C.modules.some((m) => m.id === arg)) fail(`Doll "${d.id}" unlocks on unknown unit "${arg}"`);
+  } else if (['streak', 'drills', 'badges'].includes(kind)) {
+    if (!(Number(arg) > 0)) fail(`Doll "${d.id}" has a nonsense threshold "${arg}"`);
+    if (kind === 'badges' && Number(arg) > R.badges.length) {
+      fail(`Doll "${d.id}" needs ${arg} badges but only ${R.badges.length} exist`);
+    }
+  } else {
+    fail(`Doll "${d.id}" has an unknown unlock kind "${kind}"`);
+  }
+}
+if ((DL?.dolls ?? []).length < 6) fail('Too few dolls for a set worth collecting');
+// Spread across different kinds of play, so no single habit completes the set.
+const kinds = new Set((DL?.dolls ?? []).map((d) => d.how.split(':')[0]));
+if (kinds.size < 3) fail('Every doll unlocks the same way — the set is not worth collecting');
+
 /* ---- offline: every script the page loads must be cached ----
    Forgetting one here does not break anything until she is somewhere with no
    signal, which is exactly where this app is meant to work. */
@@ -282,6 +311,7 @@ if (errors.length) {
 console.log('✓ Content valid');
 console.log(`  ${C.modules.length} modules · ${lessonCount} lessons · ${quizCount} quiz questions`);
 console.log(`  ${Object.keys(PR).length} bench drills · ${Object.values(PR).reduce((n, e) => n + e.recall.length, 0)} recall cards · ${DG.ids.length} diagrams`);
+console.log(`  ${DL.dolls.length} dolls in the collection`);
 console.log(`  ${SRC.sources.length} linked sources · ${SRC.estimates.length} declared estimates`);
 console.log(`  ${TD.items.length} teardown entries · ${TD.items.filter((i) => i.danger).length} carry a safety warning`);
 console.log(`  ${R.clues.length} clues · ${R.defects.length} defects · ${R.badges.length} badges · ${R.cheatsheets.length} cheat sheets`);

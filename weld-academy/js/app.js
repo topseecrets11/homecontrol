@@ -29,6 +29,8 @@
   var DR = window.WA_DRIVE;
   var TL = window.WA_TALLY;
   var TD = window.WA_TEARDOWN;
+  var DL = window.WA_DOLLS;
+  var PERSONAL = window.WA_PERSONAL;
 
   var view, header, tabbar, toastHost;
   var autoReadTimer = null;        // pending auto-start of the reader
@@ -187,6 +189,38 @@
         title: b.name,
         subtitle: b.desc,
         button: 'Got it'
+      });
+    });
+
+    /* Finishing a whole unit is a bigger moment than finishing a lesson, so it
+       gets the Mick celebration rather than another badge card. */
+    if (result.moduleComplete) {
+      var mod = moduleById(result.moduleComplete);
+      J.celebrate({
+        kind: 'complete',
+        character: 'mick',
+        icon: '💰',
+        kicker: 'Unit complete',
+        title: mod ? mod.title : 'Unit done',
+        subtitle: PF.line('unit'),
+        note: PERSONAL.unitNote(result.moduleComplete),
+        button: 'Cheers'
+      });
+    }
+
+    /* Anything above may have completed a doll's condition. */
+    DL.check().forEach(function (d) {
+      J.celebrate({
+        kind: 'badge',
+        art: DL.svg(d, { width: 96, suffix: 'cel' }),
+        kicker: 'Collection',
+        title: d.name,
+        subtitle: 'One more for the set. ' + DL.progress().have + ' of ' + DL.progress().total + '.',
+        note: (function () {
+          var n = DL.nextUp();
+          return n ? 'Next one: ' + n.hint + '.' : 'That is the whole set.';
+        })(),
+        button: 'Have a look'
       });
     });
 
@@ -508,6 +542,7 @@
       '<h2 class="section-h">The road to a ticket</h2>' +
       '<div class="map">' + mapHtml() + '</div>' +
       optionalHtml() +
+      collectionHtml() +
       (lead === 'badges' ? '' : badgesHtmlBlock) +
       '<div class="footer-note">' +
         '<p>Weld Academy teaches the knowledge, not the ticket. When you want the paper, that is an RTO and a coded test on a real coupon — and you will walk in already knowing the job.</p>' +
@@ -522,6 +557,10 @@
       var btn = e.target.closest('[data-tile^="opt:"]');
       if (btn) go('#/module/' + btn.getAttribute('data-tile').split(':')[1]);
     });
+
+    /* Nothing on screen points at this. Press and hold her name, three times.
+       Not spoken, not logged, not written down anywhere. */
+    PERSONAL.attachHiddenNote($('#heroHi'), openHiddenNote);
     paintTicker();
     afterPaint(function () { MK.refresh().then(paintTicker); });
   }
@@ -623,6 +662,25 @@
         });
       });
     }
+  }
+
+  /* The dolls she has, nested the way the real things sit — biggest outside,
+     smallest hidden inside. Unearned ones show as silhouettes so there is
+     always a visible next one. */
+  function collectionHtml() {
+    var p = DL.progress();
+    var next = DL.nextUp();
+    return '<a class="collection" href="#/dolls">' +
+      '<div class="collection-row">' +
+        DL.dolls.map(function (d) {
+          return DL.svg(d, { width: 42, locked: !DL.has(d.id), suffix: 'home' });
+        }).join('') +
+      '</div>' +
+      '<div class="collection-meta">' +
+        '<b>🪆 The collection · ' + p.have + ' of ' + p.total + '</b>' +
+        '<i>' + (next ? esc(next.hint) + ' for the next one' : 'Complete set') + '</i>' +
+      '</div>' +
+    '</a>';
   }
 
   /* The optional units, offered rather than pushed. Anything in here is real
@@ -912,6 +970,20 @@
 
     $('#doneBtn').addEventListener('click', function (e) {
       var res = P.completeLesson(m.id, l.id);
+
+      /* One wink, in one place: the tile that closes out her very first unit.
+         It goes ahead of the standard celebrations so it lands first. */
+      if (res.xp && PERSONAL.isUnicornLesson(m.id, l.id)) {
+        J.celebrate({
+          kind: 'complete',
+          character: 'unicorn',
+          icon: PERSONAL.unicorn().emoji,
+          kicker: 'First unit done',
+          title: PERSONAL.unicorn().line,
+          button: '🦄'
+        });
+      }
+
       announce(res, { from: e.currentTarget });
       var nextHref = isLast ? '#/quiz/' + m.id : '#/lesson/' + m.id + '/' + m.lessons[idx + 1].id;
       setTimeout(function () { go(nextHref); }, res.xp ? 420 : 0);
@@ -2102,6 +2174,88 @@
     });
   }
 
+  /* A note from Mick, full screen, until she closes it. It is deliberately not
+     a sheet, not spoken by the narrator, and not recorded in progress — it
+     leaves no trace once closed. */
+  function openHiddenNote() {
+    if ($('.note')) return;
+    var n = PERSONAL.note();
+    var el = document.createElement('div');
+    el.className = 'note';
+    el.innerHTML =
+      '<div class="note-inner">' +
+        n.lines.map(function (l) { return '<p>' + esc(l) + '</p>'; }).join('') +
+        '<div class="note-sign">' + esc(n.signoff) + '</div>' +
+        '<button class="btn btn--ghost btn--sm note-x">Close</button>' +
+      '</div>';
+    document.body.appendChild(el);
+    requestAnimationFrame(function () { el.classList.add('is-in'); });
+    J.haptic('badge');
+    J.burst(window.innerWidth / 2, window.innerHeight / 2, 26, 1);
+
+    function close() {
+      el.classList.remove('is-in');
+      setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 260);
+    }
+    el.querySelector('.note-x').addEventListener('click', close);
+    el.addEventListener('click', function (e) { if (e.target === el) close(); });
+  }
+
+  /* =========================== the collection ===========================
+   * A collection layer, not a game engine — it reuses the celebration that
+   * already exists rather than building a match-3 loop, and says so plainly
+   * on the page so nobody is expecting Candy Crush.
+   * ===================================================================== */
+
+  function renderDolls() {
+    renderTabs('');
+    var p = DL.progress();
+    var next = DL.nextUp();
+
+    view.innerHTML =
+      '<a class="back" href="#/home">‹ Back</a>' +
+      '<h1 class="page-h">🪆 The collection</h1>' +
+      '<p class="page-sub">' + p.have + ' of ' + p.total + '. They nest biggest to smallest, ' +
+      'so the set fills inward — and the little one is the hard one.</p>' +
+
+      '<div class="dolls">' +
+        DL.dolls.map(function (d) {
+          var have = DL.has(d.id);
+          return '<button class="doll-cell' + (have ? '' : ' is-locked') + '" data-doll="' + d.id + '">' +
+            DL.svg(d, { width: 84, locked: !have }) +
+            '<span class="doll-name">' + (have ? esc(d.name) : '???') + '</span>' +
+          '</button>';
+        }).join('') +
+      '</div>' +
+
+      (next ? '<div class="card"><h3>Next one</h3>' +
+        '<p>' + esc(next.hint) + '.</p></div>'
+            : '<div class="card"><h3>That is the lot</h3>' +
+              '<p>Every doll in the set. There is nothing else hiding.</p></div>') +
+
+      '<div class="card card--warn">' +
+        '<b>What this is</b>' +
+        '<p>A set to collect, not a game to play — they unlock as you get through the course ' +
+        'and turn up at the bench. If you were expecting something to tap at, that is not what ' +
+        'this is, and saying so beats letting you find out.</p>' +
+      '</div>';
+
+    $('.dolls').addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-doll]');
+      if (!btn) return;
+      var d = DL.byId(btn.getAttribute('data-doll'));
+      if (!d) return;
+      var have = DL.has(d.id);
+      tap();
+      openSheet(have ? d.name : 'Not yet',
+        '<div class="doll-big">' + DL.svg(d, { width: 150, locked: !have, suffix: 'big' }) + '</div>' +
+        (have
+          ? '<p>Number ' + d.size + ' of ' + DL.dolls.length + ' in the set.</p>' +
+            '<p class="muted">Earned for: ' + esc(d.hint.toLowerCase()) + '.</p>'
+          : '<p>Still hidden. You get this one for: <b>' + esc(d.hint.toLowerCase()) + '</b>.</p>'));
+    });
+  }
+
   /* ====================== where this comes from =========================
    * The answer to "how do I know any of this is right" is not an argument.
    * It is a list of links she can tap and check herself.
@@ -2517,6 +2671,7 @@
       case 'drive':    renderDrive(parts[1]); break;
       case 'sources':  renderSources(); break;
       case 'ticket':   renderTicketPath(); break;
+      case 'dolls':    renderDolls(); break;
       default:         renderHome();
     }
   }

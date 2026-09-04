@@ -1239,3 +1239,55 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 }
 .card--portfolio .port-row:last-of-type { border-bottom: 0; }
 .card--portfolio .port-row b { font-weight: 800; }
+
+/* ------------------------------------------------------------- collection */
+
+.collection {
+  display: block; background: linear-gradient(168deg, var(--card-2), var(--card));
+  border: 1px solid var(--line); border-radius: 16px;
+  padding: 14px; margin-bottom: var(--gap);
+}
+.collection-row {
+  display: flex; align-items: flex-end; justify-content: center;
+  gap: 2px; margin-bottom: 10px; overflow: hidden;
+}
+.collection-meta b { display: block; font-size: 15px; font-weight: 750; }
+.collection-meta i { display: block; font-style: normal; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+
+.dolls {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+  margin-bottom: var(--gap);
+}
+.doll-cell {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+  padding: 12px 6px; cursor: pointer; color: var(--text); font: inherit;
+  transition: border-color .14s, transform .12s;
+}
+.doll-cell:active { transform: scale(.96); }
+.doll-cell:not(.is-locked) { border-color: var(--line-2); }
+.doll-cell:not(.is-locked):hover { border-color: var(--accent); }
+.doll-name { font-size: 11.5px; font-weight: 700; text-align: center; line-height: 1.25; }
+.doll-cell.is-locked .doll-name { color: var(--muted); }
+.doll { display: block; }
+.doll-big { display: grid; place-items: center; margin-bottom: 16px; }
+@media (max-width: 400px) { .dolls { grid-template-columns: repeat(3, 1fr); } }
+
+.celebrate-art { display: grid; place-items: center; margin-bottom: 10px; }
+
+/* ------------------------------------------------------------- the note */
+
+.note {
+  position: fixed; inset: 0; z-index: 300;
+  display: grid; place-items: center; padding: 26px;
+  background: rgba(8,9,12,.94);
+  opacity: 0; transition: opacity .26s ease;
+}
+.note.is-in { opacity: 1; }
+.note-inner {
+  max-width: 460px; text-align: center;
+  transform: translateY(10px); transition: transform .3s cubic-bezier(.22,.9,.3,1);
+}
+.note.is-in .note-inner { transform: translateY(0); }
+.note-inner p { font-size: 18px; line-height: 1.7; margin: 0 0 16px; }
+.note-sign { color: var(--accent); font-size: 17px; font-weight: 750; margin: 20px 0 26px; }
