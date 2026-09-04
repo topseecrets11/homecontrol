@@ -282,7 +282,10 @@
            ['#/kit/checklist', '✅', 'Pre-flight checklist', 'Before the helmet goes down'],
            ['#/kit/sheets', '📋', 'Cheat sheets', 'Amps, volts, gas, sizes'],
            ['#/kit/log', '📓', 'Weld log', 'Your own record'],
-           ['#/kit/scrap', '💰', 'Scrap & prices', 'What metal is worth today']
+           ['#/kit/scrap', '💰', 'Prices', 'What metal is worth today'],
+           ['#/kit/tally', '⚖️', 'My pile', 'What is on your scales, and what it is worth'],
+           ['#/kit/teardown', '🔩', 'Worth stripping?', 'What is inside it, and is it worth the hour'],
+           ['#/drive', '🚗', 'Drive Mode', 'A whole unit read out loud']
           ].map(function (r) {
             return '<a class="drawer-item" href="' + r[0] + '">' +
               '<span class="drawer-ico">' + r[1] + '</span>' +
@@ -292,6 +295,10 @@
           '<div class="drawer-sec">Yours</div>' +
           '<a class="drawer-item" href="#/home"><span class="drawer-ico">🗺️</span>' +
             '<span class="drawer-txt"><b>The map</b><i>Progress, badges, daily challenge</i></span></a>' +
+          '<a class="drawer-item" href="#/ticket"><span class="drawer-ico">🎓</span>' +
+            '<span class="drawer-txt"><b>Getting the ticket</b><i>What counts, and how RPL works</i></span></a>' +
+          '<a class="drawer-item" href="#/sources"><span class="drawer-ico">📚</span>' +
+            '<span class="drawer-txt"><b>Where this comes from</b><i>Every source, linked — check it yourself</i></span></a>' +
           '<a class="drawer-item" href="#/settings"><span class="drawer-ico">⚙️</span>' +
             '<span class="drawer-txt"><b>Settings</b><i>Voice, sound, AI scan, reset</i></span></a>' +
         '</div>' +
@@ -503,7 +510,10 @@
       optionalHtml() +
       (lead === 'badges' ? '' : badgesHtmlBlock) +
       '<div class="footer-note">' +
-        '<p>Weld Academy teaches the knowledge, not the ticket. When you want the paper, that is TAFE and a coded test on a real coupon — you will walk in already knowing the job.</p>' +
+        '<p>Weld Academy teaches the knowledge, not the ticket. When you want the paper, that is an RTO and a coded test on a real coupon — and you will walk in already knowing the job.</p>' +
+        '<p>Written by an AI, built on published standards, and <a href="#/sources">every source is linked</a> so you can check any of it yourself.</p>' +
+        '<a class="btn btn--ghost btn--sm" href="#/ticket">Getting the ticket</a> ' +
+        '<a class="btn btn--ghost btn--sm" href="#/sources">Sources</a> ' +
         '<a class="btn btn--ghost btn--sm" href="#/settings">Settings</a>' +
       '</div>';
 
@@ -817,7 +827,25 @@
         '<div class="quiz-icon">🎯</div>' +
         '<div><h3>Checkpoint quiz</h3><p>' + esc(quizStatus) + '</p></div>' +
         '<div class="quiz-go">›</div>' +
-      '</a>';
+      '</a>' +
+      checkedAgainstHtml(m);
+  }
+
+  /* The claim attached to the content rather than buried three taps away: what
+     this particular unit is built on, with the links right there. */
+  function checkedAgainstHtml(m) {
+    var S = window.WA_SOURCES;
+    if (!S) return '';
+    var hits = S.byUnit(m.id);
+    if (!hits.length) return '<p class="checked"><a href="#/sources">Where all of this comes from →</a></p>';
+    return '<div class="checked">' +
+      '<b>Checked against</b>' +
+      hits.map(function (s) {
+        return '<a href="' + esc(s.url) + '" target="_blank" rel="noopener noreferrer">' +
+          esc(s.title) + ' ↗</a>';
+      }).join('') +
+      '<a class="checked-all" href="#/sources">All sources →</a>' +
+    '</div>';
   }
 
   /* ============================ lesson + modes ========================== */
@@ -2074,6 +2102,132 @@
     });
   }
 
+  /* ====================== where this comes from =========================
+   * The answer to "how do I know any of this is right" is not an argument.
+   * It is a list of links she can tap and check herself.
+   * ===================================================================== */
+
+  function renderSources() {
+    renderTabs('');
+    var S = window.WA_SOURCES;
+
+    view.innerHTML =
+      '<a class="back" href="#/home">‹ Back</a>' +
+      '<h1 class="page-h">Where this comes from</h1>' +
+      '<p class="page-sub">Every claim in here is built on something published. These are the ' +
+      'actual sources — tap any of them and check it yourself.</p>' +
+
+      S.kinds().map(function (k) {
+        var list = S.sources.filter(function (s) { return s.kind === k.id; });
+        if (!list.length) return '';
+        return '<h2 class="section-h">' + k.icon + ' ' + k.label + '</h2>' +
+          list.map(function (s) {
+            return '<a class="src" href="' + esc(s.url) + '" target="_blank" rel="noopener noreferrer">' +
+              '<div class="src-title">' + esc(s.title) + '</div>' +
+              '<div class="src-what">' + esc(s.what) + '</div>' +
+              '<div class="src-foot"><span class="src-where">' + esc(s.where) + '</span>' +
+                '<span class="src-go">Open ↗</span></div>' +
+            '</a>';
+          }).join('');
+      }).join('') +
+
+      '<h2 class="section-h">⚖️ Where this app is estimating</h2>' +
+      '<p class="page-sub small">Not everything here has a standard behind it. These are ' +
+      'experience and arithmetic, and saying so is what keeps the rest of the page worth ' +
+      'anything.</p>' +
+      S.estimates.map(function (e) {
+        return '<div class="card"><h3>' + esc(e.what) + '</h3><p>' + esc(e.why) + '</p></div>';
+      }).join('') +
+
+      '<h2 class="section-h">📄 What this is</h2>' +
+      '<div class="card">' +
+        S.statement.map(function (p) { return '<p>' + esc(p) + '</p>'; }).join('') +
+        '<a class="btn btn--primary" href="#/ticket">The path to an actual ticket →</a>' +
+      '</div>';
+  }
+
+  /* ======================= the path to a ticket ==========================
+   * She will not get certified by an app, and the app says so. But
+   * recognition of prior learning is real, and the evidence for it is
+   * exactly what she has been quietly collecting all along.
+   * ===================================================================== */
+
+  function renderTicketPath() {
+    renderTabs('');
+    var log = P.state.log || [];
+    var withPhotos = log.filter(function (e) { return !!e.photo; });
+    var drills = P.drillCount();
+    var mods = C.modules.filter(function (m) { return m.tier !== 'advanced'; });
+    var doneMods = mods.filter(function (m) { return P.moduleComplete(m.id); });
+
+    view.innerHTML =
+      '<a class="back" href="#/home">‹ Back</a>' +
+      '<h1 class="page-h">🎓 Getting the actual ticket</h1>' +
+      '<p class="page-sub">This app does not certify you and never will. But it is not a ' +
+      'dead end either — here is the honest route from here to paper.</p>' +
+
+      '<div class="card">' +
+        '<h3>What recognition of prior learning is</h3>' +
+        '<p>RPL means a registered training organisation assesses skills you already have ' +
+        'instead of making you sit through teaching you do not need. It is a normal, funded ' +
+        'part of the system, not a loophole. You turn up, you show what you can do and what ' +
+        'you know, and they credit the units you can already evidence.</p>' +
+        '<p>It matters here because the gap between "knows the theory cold and has done the ' +
+        'drills" and "holds a certificate" is much smaller than the gap between knowing ' +
+        'nothing and holding one.</p>' +
+      '</div>' +
+
+      '<h2 class="section-h">What you have got so far</h2>' +
+      '<div class="card card--portfolio">' +
+        '<div class="port-row"><span>Units finished</span><b>' + doneMods.length + ' of ' + mods.length + '</b></div>' +
+        '<div class="port-row"><span>Bench drills done</span><b>' + drills + '</b></div>' +
+        '<div class="port-row"><span>Weld log entries</span><b>' + log.length + '</b></div>' +
+        '<div class="port-row"><span>With dated photos</span><b>' + withPhotos.length + '</b></div>' +
+        '<div class="port-row"><span>Badges earned</span><b>' + P.state.badges.length + '</b></div>' +
+        (log.length
+          ? '<a class="btn btn--ghost btn--sm" href="#/kit/log">Open the log</a>'
+          : '<p class="muted small">The weld log is the bit that counts most and it is empty. ' +
+            'Photograph what you weld, dated, from now on — that is the evidence.</p>') +
+      '</div>' +
+
+      '<div class="card">' +
+        '<h3>What an assessor actually wants to see</h3>' +
+        '<p>Not a certificate from an app. Evidence that you can do the work:</p>' +
+        '<ul>' +
+          '<li><b>Dated photographs of your own welds</b>, ideally showing progression over ' +
+          'months rather than one good day. This is what the weld log is for.</li>' +
+          '<li><b>Cut-and-etched coupons and bend tests</b> — a weld cut through, polished and ' +
+          'etched shows penetration and fusion in a way a photo of the surface cannot.</li>' +
+          '<li><b>A record of what you have practised</b>, which is what the drill log is.</li>' +
+          '<li><b>Any workplace or supervisor statements</b> you can get, if you have welded ' +
+          'for anyone.</li>' +
+          '<li><b>Knowledge</b>, which they will test by asking. That is the part this app is ' +
+          'genuinely good at.</li>' +
+        '</ul>' +
+      '</div>' +
+
+      '<div class="card">' +
+        '<h3>The realistic shape of it</h3>' +
+        '<p>Keep learning in the ute and at the bench. Do the drills, photograph them, and ' +
+        'keep the coupons. When the log has months in it, ring a few RTOs and ask what they ' +
+        'would credit through RPL and what gap training they would want.</p>' +
+        '<p>Most likely it is a small number of gap units and a coded test on a real coupon — ' +
+        'months rather than years, and you walk in already knowing the job instead of learning ' +
+        'it in front of an assessor.</p>' +
+        '<p class="muted small">No promises on time or cost: both depend entirely on the RTO ' +
+        'and your state, and anyone who quotes you a number without seeing your evidence is ' +
+        'guessing.</p>' +
+      '</div>' +
+
+      '<div class="card">' +
+        '<h3>Where to look</h3>' +
+        '<p>The national register lists every RTO and exactly what each qualification requires.</p>' +
+        '<a class="btn btn--primary" href="https://training.gov.au/Training/Details/MEM31420" ' +
+          'target="_blank" rel="noopener noreferrer">MEM31420 Certificate III ↗</a>' +
+        '<a class="btn btn--ghost btn--sm" href="#/sources">All the sources →</a>' +
+      '</div>';
+  }
+
   /* ============================ settings ================================ */
 
   function renderSettings() {
@@ -2361,6 +2515,8 @@
       case 'kit':      renderKit(parts[1]); break;
       case 'settings': renderSettings(); break;
       case 'drive':    renderDrive(parts[1]); break;
+      case 'sources':  renderSources(); break;
+      case 'ticket':   renderTicketPath(); break;
       default:         renderHome();
     }
   }

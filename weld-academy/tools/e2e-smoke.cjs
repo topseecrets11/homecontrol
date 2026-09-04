@@ -102,7 +102,7 @@ function check(name, cond, extra) {
   await page.click('#menuBtn');
   await page.waitForSelector('.drawer-panel');
   check('menu lists every unit plus the shed tools',
-    (await page.locator('.drawer-item').count()) === WA_MODULE_COUNT + 5 + 2);
+    (await page.locator('.drawer-item').count()) === WA_MODULE_COUNT + 8 + 4);
   await shot(page, '16-menu.png');
   await page.click('.drawer-x');
   await page.waitForTimeout(320);
@@ -653,6 +653,52 @@ function check(name, cond, extra) {
   check('every lesson listened to is credited, including the last',
     drive.credited === drive.lessons, drive);
   check('finishing clears the resume point', drive.resumeCleared, drive);
+
+  /* ---------- where this comes from ---------- */
+  await page.goto(APP + '#/sources');
+  await page.waitForSelector('.src');
+  await dismiss(page);
+  check('every source is a real tappable link, not a name in prose',
+    (await page.locator('.src[href^="https://"]').count()) >= 8);
+  check('links open away from the app', await page.evaluate(() =>
+    [...document.querySelectorAll('.src')].every(a =>
+      a.target === '_blank' && /noopener/.test(a.rel))));
+  check('no placeholder or search-page links', await page.evaluate(() =>
+    WA_SOURCES.sources.every(s => !/example\.com|TODO|\?q=|\/search/i.test(s.url))));
+  check('the standards behind the strongest claim are there', await page.evaluate(() => {
+    const ids = WA_SOURCES.sources.map(s => s.id);
+    return ids.includes('iarc') && ids.includes('as1338') && ids.includes('as1554-1');
+  }));
+  check('it says plainly that an AI wrote this', await page.evaluate(() =>
+    WA_SOURCES.statement.some(p => /written by an AI/i.test(p))));
+  check('and lists where the app is estimating rather than citing',
+    (await page.locator('#view').textContent()).includes('Where this app is estimating'));
+  check('estimates cover the guessy bits by name', await page.evaluate(() => {
+    const all = WA_SOURCES.estimates.map(e => e.what.toLowerCase()).join(' | ');
+    return /amperage/.test(all) && /scrap/.test(all) && /yard pays/.test(all);
+  }));
+  await shot(page, '23-sources.png');
+
+  // The claim attached to the content, not buried three taps away.
+  await page.goto(APP + '#/module/safety');
+  await page.waitForSelector('.checked');
+  await dismiss(page);
+  check('a unit shows what it was checked against',
+    (await page.locator('.checked a[href^="https://"]').count()) >= 1);
+
+  /* ---------- the honest path to a ticket ---------- */
+  await page.goto(APP + '#/ticket');
+  await page.waitForSelector('.card--portfolio');
+  await dismiss(page);
+  const ticket = await page.textContent('#view');
+  check('it says outright that the app does not certify her', /does not certify/i.test(ticket));
+  check('it explains RPL rather than just naming it', /registered training organisation/i.test(ticket));
+  check('the portfolio counts the evidence she has been collecting',
+    (await page.locator('.port-row').count()) >= 5);
+  check('it names what an assessor actually wants', /cut-and-etched|bend test/i.test(ticket));
+  check('and makes no promises about time or cost',
+    /No promises on time or cost/i.test(ticket));
+  await shot(page, '24-ticket.png');
 
   /* ---------- settings, sound + AI plumbing ---------- */
   await page.goto(APP + '#/settings');

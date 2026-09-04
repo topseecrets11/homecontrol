@@ -42,3 +42,9 @@ jobs:
 
       - name: End-to-end smoke test
         run: node tools/e2e-smoke.cjs
+
+      # The sources page exists so its claims can be checked, so a dead link on
+      # it is a real defect. Sites that block scripted requests are reported as
+      # unverified rather than failing the build.
+      - name: Check the source links still resolve
+        run: node tools/check-links.mjs
