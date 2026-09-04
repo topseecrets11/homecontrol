@@ -11,7 +11,8 @@ const root = join(here, '..');
 
 const sandbox = { window: {} };
 for (const file of ['js/content.js', 'js/reference.js', 'js/diagrams.js',
-                    'js/practice.js', 'js/content-mastery.js', 'js/script.js']) {
+                    'js/practice.js', 'js/content-mastery.js', 'js/script.js',
+                    'js/teardown.js']) {
   const src = readFileSync(join(root, file), 'utf8');
   new Function('window', src)(sandbox.window);
 }
@@ -22,6 +23,7 @@ const PR = sandbox.window.WA_PRACTICE;
 const DG = sandbox.window.WA_DIAGRAMS;
 const DMAP = sandbox.window.WA_DIAGRAM_MAP;
 const SC = sandbox.window.WA_SCRIPT;
+const TD = sandbox.window.WA_TEARDOWN;
 
 const errors = [];
 const fail = (msg) => errors.push(msg);
@@ -196,6 +198,24 @@ for (const id of DG?.ids ?? []) {
   if (!SC.diagramLine(id)) fail(`Diagram "${id}" has no spoken description in js/script.js`);
 }
 
+/* ---- teardown: every entry has to commit to an answer ---- */
+
+const seenTd = new Set();
+for (const it of TD?.items ?? []) {
+  if (seenTd.has(it.id)) fail(`Teardown entry "${it.id}" is duplicated`);
+  seenTd.add(it.id);
+  if (!it.name || !it.icon) fail(`Teardown entry "${it.id}" is missing a name or icon`);
+  if (!['strip', 'whole', 'leave'].includes(it.verdict)) {
+    fail(`Teardown entry "${it.id}" has no clear verdict (got "${it.verdict}")`);
+  }
+  if (!it.verdictWhy) fail(`Teardown entry "${it.id}" gives a verdict without saying why`);
+  // She learns with her hands, so the memory hook is not optional.
+  if (!it.hook) fail(`Teardown entry "${it.id}" has no word-association hook`);
+  if (!it.metals) fail(`Teardown entry "${it.id}" does not say what is in it`);
+  if (!it.notes?.length) fail(`Teardown entry "${it.id}" has no notes`);
+  if (!(it.time > 0)) fail(`Teardown entry "${it.id}" has no time estimate`);
+}
+
 /* ---- offline: every script the page loads must be cached ----
    Forgetting one here does not break anything until she is somewhere with no
    signal, which is exactly where this app is meant to work. */
@@ -225,4 +245,5 @@ if (errors.length) {
 console.log('✓ Content valid');
 console.log(`  ${C.modules.length} modules · ${lessonCount} lessons · ${quizCount} quiz questions`);
 console.log(`  ${Object.keys(PR).length} bench drills · ${Object.values(PR).reduce((n, e) => n + e.recall.length, 0)} recall cards · ${DG.ids.length} diagrams`);
+console.log(`  ${TD.items.length} teardown entries · ${TD.items.filter((i) => i.danger).length} carry a safety warning`);
 console.log(`  ${R.clues.length} clues · ${R.defects.length} defects · ${R.badges.length} badges · ${R.cheatsheets.length} cheat sheets`);

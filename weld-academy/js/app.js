@@ -27,6 +27,8 @@
   var MK = window.WA_MARKET;
   var PF = window.WA_PROFILE;
   var DR = window.WA_DRIVE;
+  var TL = window.WA_TALLY;
+  var TD = window.WA_TEARDOWN;
 
   var view, header, tabbar, toastHost;
   var autoReadTimer = null;        // pending auto-start of the reader
@@ -1514,12 +1516,16 @@
       { id: 'checklist', label: '✅ Pre-flight' },
       { id: 'sheets', label: '📋 Cheat sheets' },
       { id: 'log', label: '📓 Weld log' },
-      { id: 'scrap', label: '💰 Scrap & prices' }
+      { id: 'scrap', label: '💰 Prices' },
+      { id: 'tally', label: '⚖️ My pile' },
+      { id: 'teardown', label: '🔩 Worth stripping?' }
     ];
 
     var body = tab === 'sheets' ? kitSheets()
              : tab === 'log' ? kitLog()
              : tab === 'scrap' ? kitScrap()
+             : tab === 'tally' ? kitTally()
+             : tab === 'teardown' ? kitTeardown()
              : kitChecklist();
 
     view.innerHTML =
@@ -1534,6 +1540,7 @@
     if (tab === 'checklist') wireChecklist();
     if (tab === 'log') wireLog();
     if (tab === 'scrap') wireScrap();
+    if (tab === 'tally') wireTally();
 
     // One delegated handler for every tile on this page.
     $('#kitBody').addEventListener('click', function (e) {
@@ -1543,6 +1550,203 @@
       if (parts[0] === 'scrap') openScrapSheet(+parts[1]);
       else if (parts[0] === 'cheat') openCheatSheet(+parts[1]);
       else if (parts[0] === 'check') openCheckSheet(+parts[1]);
+      else if (parts[0] === 'td') openTeardownSheet(parts[1]);
+    });
+  }
+
+  /* ---- what's in this thing? ---- */
+
+  function kitTeardown() {
+    return '<p class="page-sub">Someone has handed you an alternator. Is it worth the hour? ' +
+      'Every one of these ends with the same call: strip it, sell it whole, or leave it.</p>' +
+      tiles(TD.items.map(function (it) {
+        var v = TD.verdict(it.verdict);
+        return { key: 'td:' + it.id, icon: it.icon, title: it.name, sub: v.icon + ' ' + v.label };
+      })) +
+      '<div class="card card--warn">' +
+        '<b>These are ranges, not promises</b>' +
+        '<p>A big truck alternator and a little Japanese one are different animals, and prices ' +
+        'move. Weigh what you actually get and keep your own notes in the tally — after a few ' +
+        'loads yours will beat any table.</p>' +
+      '</div>';
+  }
+
+  function openTeardownSheet(id) {
+    var it = TD.byId(id);
+    if (!it) return;
+    var v = TD.verdict(it.verdict);
+    openSheet(it.icon + ' ' + it.name,
+      '<div class="td-verdict ' + v.cls + '">' + v.icon + ' ' + esc(v.label) + '</div>' +
+      '<p>' + esc(it.plain) + '</p>' +
+      '<div class="td-hook"><span>Remember it as</span><b>' + esc(it.hook) + '</b></div>' +
+      '<div class="dx-sec"><b>What is in it</b><p>' + esc(it.metals) + '</p></div>' +
+      '<div class="dx-sec"><b>What it takes</b><p>About ' + it.time + ' minutes once you have ' +
+        'done a few. ' + esc(it.tools) + '</p></div>' +
+      '<div class="dx-sec dx-sec--fix"><b>' + esc(v.label) + '</b><p>' + esc(it.verdictWhy) + '</p></div>' +
+      (it.danger ? '<div class="td-danger"><b>⚠️ Read this bit</b><p>' + esc(it.danger) + '</p></div>' : '') +
+      '<div class="dx-sec"><b>Worth knowing</b><ul>' +
+        it.notes.map(function (nn) { return '<li>' + esc(nn) + '</li>'; }).join('') + '</ul></div>');
+  }
+
+  /* ---- her scales, her ledger ---- */
+
+  function money(n) {
+    return '$' + Math.round(n).toLocaleString('en-AU');
+  }
+
+  function kitTally() {
+    var v = TL.valuePile();
+    var costs = TL.tripCost();
+    var life = TL.lifetime();
+
+    var pileHtml = v.lines.length
+      ? '<div class="tally-lines">' + v.lines.map(function (l) {
+          return '<div class="tally-line">' +
+            '<span class="tally-ico">' + l.icon + '</span>' +
+            '<span class="tally-metal"><b>' + esc(l.label) + '</b>' +
+              '<i>' + (Math.round(l.kg * 10) / 10) + ' kg</i></span>' +
+            '<span class="tally-val">' +
+              (l.known
+                ? '<b>' + money(l.yardLow) + '–' + money(l.yardHigh) + '</b>' +
+                  '<i>' + money(l.spot) + ' at spot' + (l.live ? '' : ' · estimate') + '</i>'
+                : '<i>no price</i>') +
+            '</span>' +
+          '</div>';
+        }).join('') + '</div>'
+      : '<p class="muted">Nothing weighed in yet. Add what is on your scales.</p>';
+
+    return '<p class="page-sub">What you are sitting on, valued two ways — because the ' +
+      'number on the world market and the number a yard hands you are not the same, and ' +
+      'the gap is the business.</p>' +
+
+      '<div class="card card--tally">' +
+        '<div class="tally-head">' +
+          '<div><span class="tally-kicker">Yard would pay</span>' +
+            '<span class="tally-big">' + (v.total.spot
+              ? money(v.total.yardLow) + '–' + money(v.total.yardHigh) : '—') + '</span></div>' +
+          '<div class="tally-spot">' + (v.total.spot ? money(v.total.spot) + ' at spot' : '') + '</div>' +
+        '</div>' +
+        pileHtml +
+        (costs > 0 ? '<div class="tally-costs">Less ' + money(costs) + ' of running around · ' +
+          '<b>' + money(Math.max(0, v.total.yardLow - costs)) + '–' +
+          money(Math.max(0, v.total.yardHigh - costs)) + ' actually yours</b></div>' : '') +
+        (v.total.anyEstimate ? '<p class="muted small">Some of those have no live feed, so they ' +
+          'use a rough standing figure — marked as an estimate rather than dressed up as a price.</p>' : '') +
+        '<div class="tally-actions">' +
+          '<button class="btn btn--primary" id="tallyAdd">＋ Weigh something in</button>' +
+          '<button class="btn btn--ghost btn--sm" id="tallyTrip">⛽ Log a run</button>' +
+          (v.lines.length ? '<button class="btn btn--ghost btn--sm" id="tallySell">Mark as sold</button>' : '') +
+        '</div>' +
+      '</div>' +
+
+      (life.loads ? '<h2 class="section-h">What you have actually made</h2>' +
+        '<div class="card">' +
+          '<div class="life-row"><span>' + life.loads + ' load' + (life.loads === 1 ? '' : 's') +
+            ' · ' + Math.round(life.kg) + ' kg</span></div>' +
+          '<div class="life-row"><span>Paid</span><b>' + money(life.paid) + '</b></div>' +
+          '<div class="life-row"><span>Fuel and running</span><b>−' + money(life.costs) + '</b></div>' +
+          '<div class="life-row is-total"><span>Actually made</span><b>' + money(life.profit) + '</b></div>' +
+          (life.ratio ? '<p class="muted small">Across every load you have been paid about ' +
+            Math.round(life.ratio * 100) + '% of spot. Watch that number: if one yard drags it ' +
+            'down, that is the yard, not the metal.</p>' : '') +
+        '</div>' : '') +
+
+      '<div class="card card--warn">' +
+        '<b>Why the two numbers</b>' +
+        '<p>Spot is the world price — the ceiling. A yard buys under it because they sort it, ' +
+        'cart it and on-sell it, and because they can. Knowing both means you can tell a fair ' +
+        'offer from a rubbish one instead of guessing.</p>' +
+      '</div>';
+  }
+
+  function wireTally() {
+    var addBtn = $('#tallyAdd');
+    if (addBtn) addBtn.addEventListener('click', function () {
+      openSheet('Weigh something in',
+        '<label class="field"><span>What is it</span><select class="input" id="tlMetal">' +
+          TL.metals().map(function (m) {
+            return '<option value="' + m.id + '">' + m.icon + ' ' + esc(m.label) + '</option>';
+          }).join('') +
+        '</select></label>' +
+        '<label class="field"><span>Kilos on the scales</span>' +
+          '<input class="input" id="tlKg" type="number" inputmode="decimal" step="0.1" min="0" ' +
+          'placeholder="0.0"></label>' +
+        '<label class="field"><span>Note (optional)</span>' +
+          '<input class="input" id="tlNote" type="text" placeholder="Off the Smiths job"></label>' +
+        '<div id="tlGrades" class="muted small"></div>' +
+        '<button class="btn btn--primary" id="tlSave">Add to the pile</button>');
+
+      function grades() {
+        var m = TL.metals().filter(function (x) { return x.id === $('#tlMetal').value; })[0];
+        $('#tlGrades').textContent = m ? m.grades : '';
+      }
+      $('#tlMetal').addEventListener('change', grades);
+      grades();
+
+      $('#tlSave').addEventListener('click', function () {
+        var kg = parseFloat($('#tlKg').value);
+        if (!(kg > 0)) { toast('How many kilos?', 'warn'); return; }
+        TL.add($('#tlMetal').value, kg, $('#tlNote').value);
+        J.sound('xp'); J.haptic('tap');
+        closeSheet();
+        renderKit('tally');
+      });
+    });
+
+    var tripBtn = $('#tallyTrip');
+    if (tripBtn) tripBtn.addEventListener('click', function () {
+      openSheet('Log a run',
+        '<p class="muted small">A drive out to pick something up is a cost against the load, ' +
+        'whether it feels like one or not. Log it and the ledger shows what you actually made.</p>' +
+        '<label class="field"><span>Kilometres</span>' +
+          '<input class="input" id="tlKm" type="number" inputmode="decimal" step="1" min="0" ' +
+          'placeholder="0"></label>' +
+        '<label class="field"><span>Litres of fuel (optional)</span>' +
+          '<input class="input" id="tlLitres" type="number" inputmode="decimal" step="0.1" min="0"></label>' +
+        '<label class="field"><span>Price per litre (optional)</span>' +
+          '<input class="input" id="tlFuel" type="number" inputmode="decimal" step="0.01" min="0" ' +
+          'placeholder="1.85"></label>' +
+        '<p class="muted small">Leave the fuel blank and it estimates at about 22 cents a ' +
+        'kilometre for a ute, which covers fuel and a bit of the wear.</p>' +
+        '<button class="btn btn--primary" id="tlTripSave">Add the run</button>');
+
+      $('#tlTripSave').addEventListener('click', function () {
+        var km = parseFloat($('#tlKm').value);
+        if (!(km > 0)) { toast('How far did you go?', 'warn'); return; }
+        TL.addTrip(km, $('#tlLitres').value, $('#tlFuel').value);
+        J.sound('tap');
+        closeSheet();
+        renderKit('tally');
+      });
+    });
+
+    var sellBtn = $('#tallySell');
+    if (sellBtn) sellBtn.addEventListener('click', function () {
+      var v = TL.valuePile();
+      openSheet('Mark it sold',
+        '<p class="muted small">What did they actually hand you? Recording it against what it ' +
+        'was worth is how you find out which yards are straight with you.</p>' +
+        (v.total.spot ? '<p>Expected: <b>' + money(v.total.yardLow) + '–' +
+          money(v.total.yardHigh) + '</b></p>' : '') +
+        '<label class="field"><span>Paid</span>' +
+          '<input class="input" id="tlPaid" type="number" inputmode="decimal" step="0.01" min="0" ' +
+          'placeholder="0.00"></label>' +
+        '<label class="field"><span>Which yard (optional)</span>' +
+          '<input class="input" id="tlWhere" type="text"></label>' +
+        '<button class="btn btn--primary" id="tlSold">Bank it</button>');
+
+      $('#tlSold').addEventListener('click', function () {
+        var paid = parseFloat($('#tlPaid').value);
+        if (!(paid >= 0)) { toast('What did they pay?', 'warn'); return; }
+        var load = TL.sell(paid, $('#tlWhere').value);
+        closeSheet();
+        renderKit('tally');
+        if (load && load.spot) {
+          var pct = Math.round((load.paid / load.spot) * 100);
+          J.sound('complete'); J.burst(window.innerWidth / 2, 240, 30, 1.1);
+          toast('Banked. That is ' + pct + '% of spot.', 'xp');
+        }
+      });
     });
   }
 

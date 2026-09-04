@@ -23,6 +23,8 @@ var FILES = [
   './js/vision.js',
   './js/script.js',
   './js/narrator.js',
+  './js/teardown.js',
+  './js/tally.js',
   './js/ask.js',
   './js/drive.js',
   './js/market.js',

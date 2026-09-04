@@ -331,6 +331,111 @@ function check(name, cond, extra) {
   check('Logbook badge', await page.evaluate(() => WA_PROGRESS.hasBadge('logbook')));
   await shot(page, '10-log.png');
 
+  /* ---------- the tally: her scales, her ledger ---------- */
+  await page.goto(APP + '#/kit/tally');
+  await page.waitForSelector('#tallyAdd');
+  await dismiss(page);
+  check('an empty pile says so', /Nothing weighed in/.test(await page.textContent('#kitBody')));
+
+  await page.click('#tallyAdd');
+  await page.waitForSelector('#tlSave');
+  await page.selectOption('#tlMetal', 'copper');
+  await page.fill('#tlKg', '34');
+  await page.click('#tlSave');
+  await page.waitForSelector('.tally-line');
+  check('weighing something in adds it to the pile',
+    await page.evaluate(() => WA_TALLY.totals()[0].metal === 'copper' && WA_TALLY.totals()[0].kg === 34));
+
+  // The pairing is the whole point: what it is worth, and what she will get.
+  check('the pile is valued at spot AND at what a yard pays', await page.evaluate(() => {
+    WA_MARKET.state.prices.copper = { usd: 4.2 };
+    WA_MARKET.state.usdAud = 1.5;
+    const v = WA_TALLY.valuePile();
+    const l = v.lines[0];
+    return l.known && l.spot > 0 && l.yardLow < l.spot && l.yardHigh < l.spot && l.yardLow < l.yardHigh;
+  }));
+  check('a metal with no price says so rather than guessing', await page.evaluate(() => {
+    delete WA_MARKET.state.prices.copper;
+    WA_MARKET.state.usdAud = null;
+    const l = WA_TALLY.valueOf('copper', 10);
+    return l.known === false;
+  }));
+  check('estimated prices are flagged as estimates', await page.evaluate(() => {
+    const s = WA_TALLY.spotPerKg('steel');
+    return s && s.live === false;      // no live feed for steel; must not claim one
+  }));
+
+  // Fuel against the load is what turns revenue into profit.
+  await page.click('#tallyTrip');
+  await page.waitForSelector('#tlTripSave');
+  await page.fill('#tlKm', '120');
+  await page.click('#tlTripSave');
+  await page.waitForSelector('.tally-costs');
+  check('a run out is costed against the load',
+    await page.evaluate(() => WA_TALLY.tripCost() > 0));
+  check('the screen shows what is actually hers after costs',
+    /actually yours/.test(await page.textContent('.tally-costs')));
+
+  check('Old Mate can say the pile out loud', await page.evaluate(() => {
+    WA_MARKET.state.prices.copper = { usd: 4.2 };
+    WA_MARKET.state.usdAud = 1.5;
+    const s = WA_TALLY.spoken();
+    return /34 kilos of copper/.test(s) && /at spot/.test(s) && /expect/.test(s);
+  }));
+
+  await page.click('#tallySell');
+  await page.waitForSelector('#tlSold');
+  await page.fill('#tlPaid', '450');
+  await page.click('#tlSold');
+  await page.waitForTimeout(300);
+  check('selling banks the load and clears the pile', await page.evaluate(() =>
+    WA_TALLY.pile().length === 0 && WA_TALLY.history().length === 1));
+  check('the ledger records paid, costs and what she actually made', await page.evaluate(() => {
+    const l = WA_TALLY.history()[0];
+    return l.paid === 450 && l.costs > 0 && l.profit === 450 - l.costs;
+  }));
+  check('and how she did against spot across every load', await page.evaluate(() => {
+    const life = WA_TALLY.lifetime();
+    return life.loads === 1 && life.ratio > 0 && life.ratio < 1;
+  }));
+  await dismiss(page);
+  await shot(page, '21-tally.png');
+
+  /* ---------- what's in this thing ---------- */
+  await page.goto(APP + '#/kit/teardown');
+  await page.waitForSelector('.tile-btn[data-tile^="td:"]');
+  await dismiss(page);
+  check('the teardown catalogue is there',
+    (await page.locator('.tile-btn[data-tile^="td:"]').count()) === 12);
+  check('every tile leads with the verdict',
+    /Strip it|Sell it whole|Leave it/.test(await page.textContent('.tile-btn[data-tile^="td:"] .tile-s')));
+
+  await page.click('.tile-btn[data-tile="td:alternator"]');
+  await page.waitForSelector('.sheet.is-open .td-verdict');
+  check('an entry commits to an answer', (await page.locator('.td-verdict').count()) === 1);
+  check('and gives her a way to remember it', (await page.locator('.td-hook b').count()) === 1);
+  await page.click('.sheet-x');
+  await page.waitForSelector('.sheet', { state: 'detached' });
+
+  // The genuinely hazardous ones say so, in the same voice as everything else.
+  await page.click('.tile-btn[data-tile="td:ewaste-board"]');
+  await page.waitForSelector('.sheet.is-open');
+  const gold = await page.textContent('.sheet-body');
+  check('gold recovery teaches the safe way to realise it',
+    /connectors|pins/i.test(gold) && /refiner/i.test(gold), { gold: gold.slice(0, 200) });
+  check('and is straight about the chemistry rather than walking her through it',
+    /acid/i.test(gold) && /not going to walk you through/i.test(gold));
+  check('hazards are shown as warnings, not buried in bullets',
+    (await page.locator('.td-danger').count()) === 1);
+  await shot(page, '22-teardown.png');
+  await page.click('.sheet-x');
+  await page.waitForSelector('.sheet', { state: 'detached' });
+
+  check('refrigerant work is named as licensed', await page.evaluate(() =>
+    /licensed/i.test(WA_TEARDOWN.byId('compressor').danger)));
+  check('burning insulation is called out as illegal', await page.evaluate(() =>
+    WA_TEARDOWN.byId('loom').notes.some(n => /never burn/i.test(n))));
+
   /* ---------- ask old mate in her own words ---------- */
   await page.goto(APP + '#/doctor');
   await page.waitForSelector('#askBox');
