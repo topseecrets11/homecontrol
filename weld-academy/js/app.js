@@ -500,6 +500,7 @@
       (lead === 'badges' ? badgesHtmlBlock : '') +
       '<h2 class="section-h">The road to a ticket</h2>' +
       '<div class="map">' + mapHtml() + '</div>' +
+      optionalHtml() +
       (lead === 'badges' ? '' : badgesHtmlBlock) +
       '<div class="footer-note">' +
         '<p>Weld Academy teaches the knowledge, not the ticket. When you want the paper, that is TAFE and a coded test on a real coupon — you will walk in already knowing the job.</p>' +
@@ -507,6 +508,10 @@
       '</div>';
 
     wireDaily();
+    view.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-tile^="opt:"]');
+      if (btn) go('#/module/' + btn.getAttribute('data-tile').split(':')[1]);
+    });
     paintTicker();
     afterPaint(function () { MK.refresh().then(paintTicker); });
   }
@@ -610,8 +615,25 @@
     }
   }
 
+  /* The optional units, offered rather than pushed. Anything in here is real
+     and useful, but leading with it at someone who has not asked reads as a
+     lecture — so it sits under the map, clearly marked, and stays shut until
+     she goes looking. */
+  function optionalHtml() {
+    var opt = C.modules.filter(function (m) { return m.tier === 'advanced'; });
+    if (!opt.length) return '';
+    return '<h2 class="section-h">If you want it</h2>' +
+      tiles(opt.map(function (m) {
+        var pct = P.modulePercent(m.id);
+        return { key: 'opt:' + m.id, icon: m.icon, title: m.title,
+                 sub: pct ? pct + '% done · optional' : m.lessons.length + ' lessons · optional' };
+      }));
+  }
+
+  /* The road to a ticket. Optional units are deliberately not on it — they get
+     their own tile underneath, so the main path stays the main path. */
   function mapHtml() {
-    return C.modules.map(function (m, i) {
+    return C.modules.filter(function (m) { return m.tier !== 'advanced'; }).map(function (m, i) {
       var pct = P.modulePercent(m.id);
       var prof = P.proficiency(m.id);
       var unlocked = P.moduleUnlocked(m.id);
@@ -714,7 +736,10 @@
     renderTabs('course');
     var tiers = [
       { id: 'core', title: 'Core units', sub: 'Get proficient in each process' },
-      { id: 'mastery', title: 'Mastery units', sub: 'Go past competent — the knowledge that separates trades from hobbyists' }
+      { id: 'mastery', title: 'Mastery units', sub: 'Go past competent — the knowledge that separates trades from hobbyists' },
+      // Optional, and said so plainly. Nothing here is needed for the welding,
+      // and it is not put in front of her as though it were.
+      { id: 'advanced', title: 'If you want it', sub: 'Optional. Not needed for any of the above — here for when you feel like going deeper' }
     ];
 
     view.innerHTML =

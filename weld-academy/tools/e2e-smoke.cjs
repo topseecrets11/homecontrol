@@ -40,6 +40,7 @@ function check(name, cond, extra) {
   });
 
   await page.goto(APP);
+  const WA_MODULE_COUNT = await page.evaluate(() => WA_CONTENT.modules.length);
 
   /* ---------- onboarding: name, then the eight profile questions ---------- */
   await page.waitForSelector('#wstart');
@@ -68,7 +69,23 @@ function check(name, cond, extra) {
 
   await page.waitForSelector('.hero');
   check('onboarding → home', (await page.textContent('.hero-hi')).includes('Tess'));
-  check('nine modules on the map', (await page.locator('.node').count()) === 9);
+    // The optional unit is deliberately off the main road, so the map shows the
+  // core and mastery units only.
+  check('the map shows the main path, not the optional unit', await page.evaluate(() => {
+    const onPath = WA_CONTENT.modules.filter(m => m.tier !== 'advanced').length;
+    return document.querySelectorAll('.node').length === onPath &&
+      WA_CONTENT.modules.some(m => m.tier === 'advanced');
+  }));
+  check('the optional unit is offered separately, marked optional', await page.evaluate(() => {
+    const t = document.querySelector('[data-tile^="opt:"]');
+    return !!t && /optional/i.test(t.textContent);
+  }));
+  check('optional units never gate the main path', await page.evaluate(() => {
+    // Every advanced unit is open from the start, and none of them blocks
+    // whatever comes after it in the list.
+    const adv = WA_CONTENT.modules.filter(m => m.tier === 'advanced');
+    return adv.length > 0 && adv.every(m => WA_PROGRESS.moduleUnlocked(m.id));
+  }));
   check('answers are saved', await page.evaluate(() =>
     WA_PROFILE.answers().hands === 'bench' && WA_PROFILE.answers().colour === 'steel'));
   check('answers pick the opening lesson mode',
@@ -85,7 +102,7 @@ function check(name, cond, extra) {
   await page.click('#menuBtn');
   await page.waitForSelector('.drawer-panel');
   check('menu lists every unit plus the shed tools',
-    (await page.locator('.drawer-item').count()) === 9 + 5 + 2);
+    (await page.locator('.drawer-item').count()) === WA_MODULE_COUNT + 5 + 2);
   await shot(page, '16-menu.png');
   await page.click('.drawer-x');
   await page.waitForTimeout(320);
@@ -194,7 +211,7 @@ function check(name, cond, extra) {
   await page.goto(APP + '#/course');
   await page.waitForSelector('.card--module');
   const locked = await page.locator('.card--module.is-locked').count();
-  check('module 2 unlocked after module 1 passed', locked === 7, { lockedCards: locked });
+  check('module 2 unlocked after module 1 passed', locked === WA_MODULE_COUNT - 3, { lockedCards: locked });
   check('mastery tier is shown separately', (await page.locator('.section-h').count()) >= 2);
   await shot(page, '06-course.png');
 
@@ -330,6 +347,46 @@ function check(name, cond, extra) {
   check('log entry saved', (await page.locator('.card--log').count()) === 1);
   check('Logbook badge', await page.evaluate(() => WA_PROGRESS.hasBadge('logbook')));
   await shot(page, '10-log.png');
+
+  /* ---------- the salvage unit, and what leads versus what is offered ---- */
+  check('the practical salvage unit is core, not optional', await page.evaluate(() => {
+    const m = WA_CONTENT.modules.find(x => x.id === 'salvage');
+    return m && (m.tier || 'core') === 'core' && m.lessons.length === 4;
+  }));
+  check('the merchant unit is explicitly optional', await page.evaluate(() => {
+    const m = WA_CONTENT.modules.find(x => x.id === 'merchant');
+    return m && m.tier === 'advanced';
+  }));
+  check('it teaches soldering, testing and reading scrap before any trading',
+    await page.evaluate(() => {
+      const m = WA_CONTENT.modules.find(x => x.id === 'salvage');
+      const t = m.lessons.map(l => l.title.toLowerCase()).join(' | ');
+      return /solder/.test(t) && /multimeter/.test(t) && /inside/.test(t);
+    }));
+  check('the cans maths is stated once and is right', await page.evaluate(() => {
+    const m = WA_CONTENT.modules.find(x => x.id === 'salvage');
+    const l = m.lessons.find(x => x.id === 'salvage-4');
+    const all = (l.body.join(' ') + l.keyPoints.join(' '));
+    // ~15 g a can → 65-70 to the kilo; the refund must beat the scrap value.
+    return /65\D{1,4}70/.test(all) && /refund/i.test(all) &&
+      /never crush|never.*scrap/i.test(all);
+  }));
+  check('both new units have drills and recall cards', await page.evaluate(() =>
+    ['salvage', 'merchant'].every(id =>
+      WA_CONTENT.modules.find(m => m.id === id).lessons
+        .every(l => WA_PRACTICE[l.id] && WA_PRACTICE[l.id].recall.length >= 2))));
+  check('the business lesson separates revenue from profit', await page.evaluate(() => {
+    const l = WA_CONTENT.modules.find(m => m.id === 'merchant')
+      .lessons.find(x => x.id === 'merchant-3');
+    const all = l.body.join(' ') + l.keyPoints.join(' ');
+    return /break-even/i.test(all) && /ABN/.test(all) && /75,000/.test(all);
+  }));
+
+  await page.goto(APP + '#/course');
+  await page.waitForSelector('.card--module');
+  await dismiss(page);
+  check('the course page separates optional from the main path',
+    /If you want it/i.test(await page.textContent('#view') || await page.textContent('body')));
 
   /* ---------- the tally: her scales, her ledger ---------- */
   await page.goto(APP + '#/kit/tally');

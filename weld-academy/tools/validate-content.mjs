@@ -11,7 +11,7 @@ const root = join(here, '..');
 
 const sandbox = { window: {} };
 for (const file of ['js/content.js', 'js/reference.js', 'js/diagrams.js',
-                    'js/practice.js', 'js/content-mastery.js', 'js/script.js',
+                    'js/practice.js', 'js/content-mastery.js', 'js/content-salvage.js', 'js/script.js',
                     'js/teardown.js']) {
   const src = readFileSync(join(root, file), 'utf8');
   new Function('window', src)(sandbox.window);

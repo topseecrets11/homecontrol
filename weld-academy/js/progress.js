@@ -202,11 +202,22 @@ window.WA_PROGRESS = (function () {
 
   // A module unlocks when the one before it is complete. The UI still offers a
   // "start anyway" — never hard-block someone standing at a machine.
+  //
+  // Optional units sit outside that chain entirely: they are always open, and
+  // they never gate anything after them. Making her finish nine welding units
+  // to unlock something optional would be daft, and so would blocking the
+  // course on something she never has to do.
   function moduleUnlocked(moduleId) {
     var mods = window.WA_CONTENT.modules;
     var i = mods.findIndex(function (m) { return m.id === moduleId; });
     if (i <= 0) return true;
-    return moduleComplete(mods[i - 1].id);
+    if (mods[i].tier === 'advanced') return true;
+    // Walk back past any optional units to the last one on the main path.
+    for (var j = i - 1; j >= 0; j--) {
+      if (mods[j].tier === 'advanced') continue;
+      return moduleComplete(mods[j].id);
+    }
+    return true;
   }
 
   function overallPercent() {
