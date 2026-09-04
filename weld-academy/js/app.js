@@ -1221,7 +1221,9 @@
         '<div><h1>Ask Old Mate</h1>' +
         '<p>Been welding since before you were born. Tell him what you can see, hear or remember — you do not need to know the names, that is his end.</p></div>' +
       '</div>' +
+      askCardHtml() +
       (V.isConfigured() ? cameraCardHtml() : '') +
+      '<h2 class="section-h">Or tick what you can see</h2>' +
       '<div id="clueHost">' + cluesHtml + '</div>' +
       '<div class="doctor-actions">' +
         '<button class="btn btn--primary btn--big" id="dxBtn">Diagnose it →</button>' +
@@ -1256,6 +1258,7 @@
       showDiagnosis(Object.keys(doctorPicks));
     });
 
+    wireAsk();
     if (V.isConfigured()) wireCamera();
   }
 
@@ -1267,6 +1270,105 @@
       '</label>' +
       '<div id="scanResult"></div>' +
     '</div>';
+  }
+
+  /* ---- ask him in her own words ---- */
+
+  function speechRecognition() {
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    return SR ? new SR() : null;
+  }
+
+  function askCardHtml() {
+    var canHear = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+    return '<div class="card card--ask">' +
+      '<div class="ask-row">' +
+        '<input class="input ask-input" id="askBox" type="text" autocomplete="off" ' +
+          'placeholder="Why is my weld full of little holes?">' +
+        (canHear ? '<button class="ask-mic" id="askMic" aria-label="Ask out loud">🎤</button>' : '') +
+      '</div>' +
+      '<button class="btn btn--primary" id="askGo">Ask him</button>' +
+      '<div id="askOut"></div>' +
+    '</div>';
+  }
+
+  function renderAnswer(res) {
+    var host = $('#askOut');
+    if (!host) return;
+
+    var first = res.answers[0];
+    host.innerHTML =
+      '<div class="ask-answer' + (res.ok ? '' : ' is-stumped') + '">' +
+        '<p class="ask-text">' + esc(first.text) + '</p>' +
+        (first.href ? '<a class="ask-src" href="' + first.href + '">' +
+          (first.title ? esc(first.title) : 'Read it properly') +
+          (first.where ? ' · ' + esc(first.where) : '') + ' →</a>' : '') +
+        (res.source === 'ai' ? '<span class="ask-badge">answered by ' + esc(WA_ASK.providerName()) +
+          ', from the app\'s own notes</span>' : '') +
+      '</div>' +
+      ((res.also || res.answers.slice(1)).length
+        ? '<div class="ask-more"><b>He also reckons these are related</b>' +
+          tiles((res.also || res.answers.slice(1)).map(function (a, i) {
+            return { key: 'askmore:' + i, icon: '📖', title: a.title || 'Related', sub: a.where };
+          })) + '</div>'
+        : '');
+
+    // Read it back, because half the time she is not looking at the screen.
+    if (N.supported()) {
+      N.setScript([{ text: first.text }]);
+      N.play(0);
+    }
+
+    var more = (res.also || res.answers.slice(1));
+    var moreHost = host.querySelector('.ask-more');
+    if (moreHost) {
+      moreHost.addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-tile^="askmore:"]');
+        if (!btn) return;
+        var a = more[+btn.getAttribute('data-tile').split(':')[1]];
+        if (!a) return;
+        openSheet(a.title || 'Related',
+          '<p>' + esc(a.text) + '</p>' +
+          (a.href ? '<a class="btn btn--primary" href="' + a.href + '">Open it →</a>' : ''));
+      });
+    }
+  }
+
+  function askHim(question) {
+    question = (question || '').trim();
+    if (!question) { toast('Ask him something first.', 'warn'); return; }
+    var host = $('#askOut');
+    host.innerHTML = '<div class="ask-thinking"><span class="scan-bar"></span>Having a think…</div>';
+    WA_ASK.answer(question).then(renderAnswer);
+  }
+
+  function wireAsk() {
+    var box = $('#askBox');
+    if (!box) return;
+    $('#askGo').addEventListener('click', function () { tap(); askHim(box.value); });
+    box.addEventListener('keydown', function (e) { if (e.key === 'Enter') askHim(box.value); });
+
+    var mic = $('#askMic');
+    if (!mic) return;
+    mic.addEventListener('click', function () {
+      var rec = speechRecognition();
+      if (!rec) return;
+      rec.lang = 'en-AU';
+      rec.interimResults = false;
+      rec.maxAlternatives = 1;
+      mic.classList.add('is-live');
+      tap();
+      rec.onresult = function (e) {
+        var said = e.results[0][0].transcript;
+        box.value = said;
+        askHim(said);
+      };
+      rec.onerror = function () {
+        toast('Did not catch that — type it instead.', 'warn');
+      };
+      rec.onend = function () { mic.classList.remove('is-live'); };
+      try { rec.start(); } catch (err) { mic.classList.remove('is-live'); }
+    });
   }
 
   function wireCamera() {
@@ -1800,6 +1902,24 @@
         '<button class="btn btn--ghost btn--sm" id="voiceTest">Hear it</button>' +
       '</div>' : '') +
 
+      '<div class="card">' +
+        '<h3>💬 Let Old Mate talk properly (optional)</h3>' +
+        '<p class="muted small">He already answers from what is in this app, with no signal and ' +
+        'without inventing anything — that is the default and it needs nothing set up. Adding a key ' +
+        'lets him put the same answers in his own words. He is still only allowed to use what is in ' +
+        'here, and if there is no signal he falls straight back to the offline answer.</p>' +
+        '<label class="field"><span>Service</span><select class="input" id="chatProvider">' +
+          [['off', 'Off — offline answers only'],
+           ['anthropic', 'Claude (Anthropic)'],
+           ['openai', 'OpenAI'],
+           ['custom', 'Your own endpoint']].map(function (o) {
+            return '<option value="' + o[0] + '"' +
+              (WA_ASK.config().provider === o[0] ? ' selected' : '') + '>' + esc(o[1]) + '</option>';
+          }).join('') +
+        '</select></label>' +
+        '<div id="chatFields"></div>' +
+      '</div>' +
+
       (installPrompt ? '<div class="card card--install">' +
         '<h3>📲 Install on this device</h3>' +
         '<p class="muted">Adds it to your home screen and lets it run full screen, offline, like any other app.</p>' +
@@ -1856,6 +1976,47 @@
       go('#/home');
       render();
     });
+
+    /* The chat key fields: nothing shown at all while it is off, so there is
+       no half-finished AI panel sitting there looking broken. */
+    function paintChat() {
+      var c = WA_ASK.config();
+      var host = $('#chatFields');
+      if (!host) return;
+      if (!c.provider || c.provider === 'off') { host.innerHTML = ''; return; }
+      host.innerHTML =
+        (c.provider === 'custom'
+          ? '<label class="field"><span>Endpoint URL</span>' +
+            '<input class="input" id="chatUrl" type="url" value="' + esc(c.url || '') + '" ' +
+            'placeholder="https://…"></label>'
+          : '') +
+        '<label class="field"><span>Key</span>' +
+          '<input class="input" id="chatKey" type="password" value="' + esc(c.key || '') + '" ' +
+          'placeholder="Paste it here" autocomplete="off"></label>' +
+        '<label class="field"><span>Model (optional)</span>' +
+          '<input class="input" id="chatModel" type="text" value="' + esc(c.model || '') + '" ' +
+          'placeholder="Leave blank for the default"></label>' +
+        '<p class="muted small">The key is stored on this phone only, and is sent to that service ' +
+        'and nowhere else.</p>';
+
+      ['chatUrl', 'chatKey', 'chatModel'].forEach(function (id) {
+        var el = $('#' + id);
+        if (!el) return;
+        el.addEventListener('change', function () {
+          var cfg = WA_ASK.config();
+          cfg[id.replace('chat', '').toLowerCase()] = el.value.trim();
+          WA_ASK.save(cfg);
+        });
+      });
+    }
+
+    $('#chatProvider').addEventListener('change', function (e) {
+      var cfg = WA_ASK.config();
+      cfg.provider = e.target.value;
+      WA_ASK.save(cfg);
+      paintChat();
+    });
+    paintChat();
 
     var personaRow = $('#personaRow');
     if (personaRow) {

@@ -331,6 +331,70 @@ function check(name, cond, extra) {
   check('Logbook badge', await page.evaluate(() => WA_PROGRESS.hasBadge('logbook')));
   await shot(page, '10-log.png');
 
+  /* ---------- ask old mate in her own words ---------- */
+  await page.goto(APP + '#/doctor');
+  await page.waitForSelector('#askBox');
+  await dismiss(page);
+  check('the corpus covers the whole app', await page.evaluate(() => WA_ASK.docCount() > 80));
+
+  const asked = await page.evaluate(async () => {
+    const q = (s) => WA_ASK.offline(s);
+    return {
+      holes: q('why is my weld full of little holes').answers[0].title,
+      warp: q('how do I stop it warping').answers[0].title,
+      crack: q('why did it crack days later').answers[0].title,
+      groove: q('there is a groove along the edge of my weld').answers[0].title,
+      burn: q('I blew a hole right through it').answers[0].title,
+      wear: q('what do I need to wear').answers[0].title,
+      nonsense: q('how do I make a lasagne').ok,
+      nonsenseText: q('how do I make a lasagne').answers[0].text
+    };
+  });
+  check('plain words find the right fault: holes → porosity', /porosity/i.test(asked.holes), asked);
+  check('plain words find the right fault: warping → distortion', /distortion/i.test(asked.warp), asked);
+  check('plain words find the right fault: late crack → cold cracking', /cold cracking/i.test(asked.crack), asked);
+  check('plain words find the right fault: groove → undercut', /undercut/i.test(asked.groove), asked);
+  check('plain words find the right fault: blew through → burn-through', /burn/i.test(asked.burn), asked);
+  check('a topic question finds the lesson', /dressing/i.test(asked.wear), asked);
+
+  // The rule the whole thing is built on.
+  check('he says so rather than guessing', !asked.nonsense, asked);
+  check('and says it plainly, without inventing welding advice',
+    /not in what I have been taught|not going to.*guess/i.test(asked.nonsenseText), asked);
+
+  check('a price question is answered from the price data', await page.evaluate(() => {
+    WA_MARKET.state.rows = null;
+    const r = WA_ASK.offline("what's copper running at");
+    return r.answers[0].kind === 'price' && /copper/i.test(r.answers[0].text);
+  }));
+  check('price questions are recognised however she phrases them', await page.evaluate(() =>
+    WA_ASK.looksLikePrice("what's gold worth") === 'gold' &&
+    WA_ASK.looksLikePrice('how much is copper per kilo') === 'copper' &&
+    WA_ASK.looksLikePrice('how do I weld copper') === null));
+
+  check('the AI upgrade is off unless she sets a key',
+    await page.evaluate(() => !WA_ASK.isConfigured() && WA_ASK.providerName() === 'Off'));
+  check('with no key it still answers, offline', await page.evaluate(async () => {
+    const r = await WA_ASK.answer('why is my weld full of little holes');
+    return r.source === 'offline' && r.ok;
+  }));
+  check('a broken AI key falls back rather than failing', await page.evaluate(async () => {
+    WA_ASK.save({ provider: 'openai', key: 'sk-not-a-real-key' });
+    const r = await WA_ASK.answer('why is my weld full of little holes');
+    WA_ASK.save({ provider: 'off' });
+    return r.source === 'offline' && r.ok;      // never throws, never blank
+  }));
+
+  // The whole round trip through the UI.
+  await page.fill('#askBox', 'why is my weld full of little holes');
+  await page.click('#askGo');
+  await page.waitForSelector('.ask-answer');
+  check('asking through the box shows an answer',
+    (await page.textContent('.ask-answer')).length > 40);
+  check('the answer points at where it came from',
+    (await page.locator('.ask-src').count()) === 1);
+  await shot(page, '20-ask.png');
+
   /* ---------- drive mode ---------- */
   await page.goto(APP + '#/drive');
   await page.waitForSelector('.tile-btn[data-tile^="drive:"]');

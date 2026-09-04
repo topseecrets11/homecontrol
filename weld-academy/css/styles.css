@@ -1129,3 +1129,29 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 }
 .drive-now.is-live { color: var(--text); }
 .drive-fine { color: var(--muted); font-size: 12.5px; margin-top: 18px; }
+
+/* --------------------------------------------------------------- ask old mate */
+
+.card--ask { border-color: var(--line-2); }
+.ask-row { display: flex; gap: 9px; margin-bottom: 10px; }
+.ask-input { flex: 1; min-width: 0; }
+.ask-mic {
+  flex: none; width: 52px; height: 52px; border-radius: 13px; cursor: pointer;
+  background: var(--card-2); border: 1px solid var(--line);
+  font-size: 21px; line-height: 1;
+}
+.ask-mic.is-live { border-color: var(--accent); background: var(--accent-tint); animation: pulse 1.2s infinite; }
+@keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.07); } }
+
+.ask-thinking { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 14px; margin-top: 14px; }
+.ask-answer {
+  margin-top: 14px; padding: 15px;
+  background: var(--card-2); border-left: 3px solid var(--accent); border-radius: 0 13px 13px 0;
+}
+.ask-answer.is-stumped { border-left-color: var(--muted); }
+.ask-text { margin: 0 0 10px; line-height: 1.62; }
+.ask-src { display: inline-block; color: var(--accent); font-weight: 700; font-size: 14px; }
+.ask-badge { display: block; color: var(--muted); font-size: 12px; margin-top: 9px; }
+.ask-more { margin-top: 16px; }
+.ask-more b { display: block; font-size: 12px; text-transform: uppercase;
+  letter-spacing: 1.2px; color: var(--muted); margin-bottom: 10px; }
