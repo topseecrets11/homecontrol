@@ -2448,7 +2448,6 @@
         '<label class="field"><span>Service</span><select class="input" id="chatProvider">' +
           [['off', 'Off — offline answers only'],
            ['anthropic', 'Claude (Anthropic)'],
-           ['openai', 'OpenAI'],
            ['custom', 'Your own endpoint']].map(function (o) {
             return '<option value="' + o[0] + '"' +
               (WA_ASK.config().provider === o[0] ? ' selected' : '') + '>' + esc(o[1]) + '</option>';

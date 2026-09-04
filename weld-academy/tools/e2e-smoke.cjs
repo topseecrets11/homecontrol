@@ -540,14 +540,38 @@ function check(name, cond, extra) {
     const r = await WA_ASK.answer('why is my weld full of little holes');
     return r.source === 'offline' && r.ok;
   }));
+  // Deliberately break it and prove it still answers. The failed request logs
+  // a console error by design, so this test's own noise is discounted from the
+  // page-error check below rather than the check being loosened — a real error
+  // anywhere else in the run still fails the suite.
+  const errorsBeforeBadKey = errors.length;
   check('a broken AI key falls back rather than failing', await page.evaluate(async () => {
-    WA_ASK.save({ provider: 'openai', key: 'sk-not-a-real-key' });
+    WA_ASK.save({ provider: 'custom', url: 'https://127.0.0.1:9/never', key: 'not-a-real-key' });
     const r = await WA_ASK.answer('why is my weld full of little holes');
     WA_ASK.save({ provider: 'off' });
     return r.source === 'offline' && r.ok;      // never throws, never blank
   }));
+  const expectedFailureNoise = errors.length - errorsBeforeBadKey;
+  errors.length = errorsBeforeBadKey;
 
-  // The whole round trip through the UI.
+  // The provider list must not offer anything a browser cannot actually reach.
+  // OpenAI's API sends no CORS headers, so a direct call is blocked before it
+  // leaves the phone — an option that can never work is worse than no option.
+  await page.goto(APP + '#/settings');
+  await page.waitForSelector('#chatProvider');
+  await dismiss(page);
+  check('no provider is offered that a browser would block', await page.evaluate(() =>
+    [...document.querySelectorAll('#chatProvider option')].every(o => o.value !== 'openai')));
+  check('the providers offered can actually reach their API', await page.evaluate(() => {
+    const opts = [...document.querySelectorAll('#chatProvider option')].map(o => o.value);
+    return opts.includes('anthropic') && opts.includes('custom') && opts.includes('off');
+  }));
+
+  // The whole round trip through the UI. Back to Old Mate — the provider
+  // assertions above navigated to Settings.
+  await page.goto(APP + '#/doctor');
+  await page.waitForSelector('#askBox');
+  await dismiss(page);
   await page.fill('#askBox', 'why is my weld full of little holes');
   await page.click('#askGo');
   await page.waitForSelector('.ask-answer');
@@ -936,7 +960,10 @@ function check(name, cond, extra) {
     document.documentElement.scrollWidth - document.documentElement.clientWidth);
   check('no horizontal overflow at 1180px', wideOverflow <= 0, { wideOverflow });
 
-  check('no page errors', errors.length === 0, errors.slice(0, 5));
+  // Only the deliberate broken-key request above is discounted, and it is
+  // reported so a silently growing pile of "expected" noise stays visible.
+  check('no page errors', errors.length === 0,
+    { errors: errors.slice(0, 5), discountedFromTheBadKeyTest: expectedFailureNoise });
   check('offline price failure is handled, not thrown',
     await page.evaluate(async () => {
       const r = await WA_MARKET.refresh({ force: true });

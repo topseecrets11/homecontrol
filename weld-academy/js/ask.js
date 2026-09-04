@@ -382,7 +382,6 @@ window.WA_ASK = (function () {
   function providerName() {
     var c = config();
     return c.provider === 'anthropic' ? 'Claude'
-         : c.provider === 'openai' ? 'OpenAI'
          : c.provider === 'custom' ? 'Custom endpoint' : 'Off';
   }
 
@@ -421,25 +420,18 @@ window.WA_ASK = (function () {
           'anthropic-dangerous-direct-browser-access': 'true'
         },
         body: JSON.stringify({
-          model: cfg.model || 'claude-sonnet-5',
+          model: cfg.model || 'claude-opus-5',
           max_tokens: 400,
           messages: [{ role: 'user', content: text }]
         })
       }).then(function (r) { return r.json(); })
         .then(function (j) { return j && j.content && j.content[0] && j.content[0].text; });
     },
-    openai: function (cfg, text) {
-      return fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', authorization: 'Bearer ' + cfg.key },
-        body: JSON.stringify({
-          model: cfg.model || 'gpt-4o-mini',
-          max_tokens: 400,
-          messages: [{ role: 'user', content: text }]
-        })
-      }).then(function (r) { return r.json(); })
-        .then(function (j) { return j && j.choices && j.choices[0] && j.choices[0].message.content; });
-    },
+    /* There is deliberately no direct OpenAI option here. Their API sends no
+       CORS headers, so a browser blocks the request before it leaves the
+       phone — an option that can never work is worse than no option, and CI
+       caught exactly that failure. Anyone running an OpenAI-backed proxy can
+       point the custom endpoint below at it. */
     custom: function (cfg, text) {
       return fetch(cfg.url, {
         method: 'POST',
