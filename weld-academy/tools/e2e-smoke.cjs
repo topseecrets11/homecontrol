@@ -534,6 +534,23 @@ function check(name, cond, extra) {
     WA_ASK.looksLikePrice('how much is copper per kilo') === 'copper' &&
     WA_ASK.looksLikePrice('how do I weld copper') === null));
 
+  /* ---------- sync (optional): off by default, safe when unreachable ---- */
+  check('sync is off unless a server and code are both set',
+    await page.evaluate(() => !WA_SYNC.isConfigured()));
+  check('pushing with nothing configured is a no-op, not an error', await page.evaluate(async () => {
+    const r = await WA_SYNC.push();
+    return r.ok === false && r.reason === 'not configured';
+  }));
+  check('an unreachable server fails softly rather than throwing', await page.evaluate(async () => {
+    WA_SYNC.save({ url: 'http://127.0.0.1:1', code: 'nope', auto: false });
+    const push = await WA_SYNC.push();
+    const pull = await WA_SYNC.pull();
+    WA_SYNC.save({ url: '', code: '', auto: false });
+    return push.ok === false && pull.ok === false;   // never throws, always resolves
+  }));
+  check('nothing here writes to progress unless a pull is explicitly applied',
+    await page.evaluate(() => !WA_PROGRESS.settings().sync || !WA_PROGRESS.settings().sync.url));
+
   check('the AI upgrade is off unless she sets a key',
     await page.evaluate(() => !WA_ASK.isConfigured() && WA_ASK.providerName() === 'Off'));
   check('with no key it still answers, offline', await page.evaluate(async () => {

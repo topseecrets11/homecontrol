@@ -31,6 +31,7 @@
   var TD = window.WA_TEARDOWN;
   var DL = window.WA_DOLLS;
   var PERSONAL = window.WA_PERSONAL;
+  var SY = window.WA_SYNC;
 
   var view, header, tabbar, toastHost;
   var autoReadTimer = null;        // pending auto-start of the reader
@@ -2440,6 +2441,30 @@
       '</div>' : '') +
 
       '<div class="card">' +
+        '<h3>🔄 Sync across devices <span class="pill pill--dim">optional</span></h3>' +
+        '<p class="muted small">Off by default — everything already lives on this phone and stays ' +
+        'there. If you run the little server that ships with this app (<code>node server</code>, ' +
+        'see the README), pick any word as a code and the same code on a second device pulls your ' +
+        'progress across. That is the entire account system — no email, no password. Anyone who ' +
+        'knows your code could read it too, so pick something nobody would guess, the same as you ' +
+        'would a house key hidden under a pot.</p>' +
+        '<label class="field"><span>Server address</span>' +
+          '<input class="input" id="syncUrl" type="url" value="' + esc(SY.config().url || '') + '" ' +
+          'placeholder="http://192.168.1.20:8787"></label>' +
+        '<label class="field"><span>Your code</span>' +
+          '<input class="input" id="syncCode" type="text" value="' + esc(SY.config().code || '') + '" ' +
+          'placeholder="a word only you would pick" autocomplete="off"></label>' +
+        '<label class="switch"><input type="checkbox" id="syncAuto"' +
+          (SY.config().auto ? ' checked' : '') + '>' +
+          '<span class="switch-track"><i></i></span><span>Keep it synced automatically</span></label>' +
+        '<div class="tally-actions">' +
+          '<button class="btn btn--primary btn--sm" id="syncPush">Push this device’s progress</button>' +
+          '<button class="btn btn--ghost btn--sm" id="syncPull">Pull from that code instead</button>' +
+        '</div>' +
+        '<p class="muted small" id="syncStatus"></p>' +
+      '</div>' +
+
+      '<div class="card">' +
         '<h3>💬 Let Old Mate talk properly (optional)</h3>' +
         '<p class="muted small">He already answers from what is in this app, with no signal and ' +
         'without inventing anything — that is the default and it needs nothing set up. Adding a key ' +
@@ -2454,6 +2479,8 @@
           }).join('') +
         '</select></label>' +
         '<div id="chatFields"></div>' +
+        (SY.config().url ? '<button class="btn btn--ghost btn--sm" id="chatUseSync">' +
+          'Use my sync server instead of a key</button>' : '') +
       '</div>' +
 
       (installPrompt ? '<div class="card card--install">' +
@@ -2553,6 +2580,60 @@
       paintChat();
     });
     paintChat();
+
+    var useSyncBtn = $('#chatUseSync');
+    if (useSyncBtn) useSyncBtn.addEventListener('click', function () {
+      var cfg = WA_ASK.config();
+      cfg.provider = 'custom';
+      cfg.url = SY.config().url.replace(/\/+$/, '') + '/api/ask';
+      WA_ASK.save(cfg);
+      $('#chatProvider').value = 'custom';
+      paintChat();
+      toast('Pointed at your sync server. It needs ANTHROPIC_API_KEY set there.', 'xp');
+    });
+
+    /* ---- sync ---- */
+
+    ['syncUrl', 'syncCode'].forEach(function (id) {
+      var el = $('#' + id);
+      el.addEventListener('change', function () {
+        var cfg = SY.config();
+        cfg[id === 'syncUrl' ? 'url' : 'code'] = el.value.trim();
+        SY.save(cfg);
+      });
+    });
+    $('#syncAuto').addEventListener('change', function (e) {
+      var cfg = SY.config();
+      cfg.auto = e.target.checked;
+      SY.save(cfg);
+    });
+
+    function syncStatus(msg) { var el = $('#syncStatus'); if (el) el.textContent = msg; }
+
+    $('#syncPush').addEventListener('click', function () {
+      if (!SY.isConfigured()) { toast('Fill in the server address and a code first.', 'warn'); return; }
+      syncStatus('Pushing…');
+      SY.push().then(function (r) {
+        syncStatus(r.ok
+          ? (r.reason === 'unchanged' ? 'Already up to date.' : 'Pushed just now.')
+          : 'Could not push: ' + r.reason);
+        if (r.ok) { J.sound('xp'); J.haptic('tap'); }
+      });
+    });
+
+    $('#syncPull').addEventListener('click', function () {
+      if (!SY.isConfigured()) { toast('Fill in the server address and a code first.', 'warn'); return; }
+      if (!confirm('This replaces everything on THIS device with whatever is saved under that code. Sure?')) return;
+      syncStatus('Pulling…');
+      SY.pullAndApply().then(function (r) {
+        if (r.ok) {
+          syncStatus('Pulled. Reloading…');
+          setTimeout(function () { location.reload(); }, 500);
+        } else {
+          syncStatus('Could not pull: ' + r.reason);
+        }
+      });
+    });
 
     var personaRow = $('#personaRow');
     if (personaRow) {

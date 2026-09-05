@@ -268,6 +268,68 @@ checklist works offline."*
 
 ---
 
+## The optional server — sync and the AI proxy, self-hosted
+
+**Off by default, and the app is complete without it.** Everything above this line runs entirely in
+the browser with zero backend. This adds two things on top, for anyone who wants them; the app never
+requires it and never nags about it.
+
+```bash
+node weld-academy/server         # http://localhost:8787 — app + API, one process
+```
+
+**Zero npm dependencies.** Only Node's own built-ins (`http`, `https`, `fs`) — `node server` runs it,
+nothing to `npm install`, nothing to go stale, nothing supply-chain-shaped to audit. A genuine toy,
+on purpose.
+
+**What it adds:**
+
+- **Sync across devices.** She picks a code — any word — in **Settings → Sync**, and the same code
+  on a second device pulls her progress across. That is the entire account system: no email, no
+  password, no login screen. A code is a JSON file on disk (`server/data/<code>.json`); knowing the
+  code is the only protection it has, same as a key under a pot, and the Settings copy says so
+  plainly rather than implying anything stronger.
+- **The AI proxy**, at `/api/ask`. Set `ANTHROPIC_API_KEY` in the server's environment and point
+  **Settings → Ask Old Mate → Your own endpoint** at `<server>/api/ask` (there is a one-tap "use my
+  sync server" button once a sync server is configured). The key lives on the server, never the
+  phone — which incidentally is what fixes the whole *class* of bug that broke the earlier direct
+  OpenAI option: a browser calling a provider's API hits CORS, a server calling it does not.
+
+**What it deliberately does not do:** real auth (a sync code is obscurity, not a password), rate
+limiting beyond a crude body-size cap, or HTTPS (put it behind a reverse proxy for that on a public
+box). None of it replaces localStorage — sync is a periodic push and an occasional pull *against*
+it, and if the server is unreachable the app does not know or care; every offline feature above this
+line keeps working exactly as before with this process switched off.
+
+**Verified for real, not just each half in isolation** — `tools/test-sync-integration.mjs` runs the
+actual server, opens two genuinely separate browser contexts (no shared storage) with Playwright,
+pushes progress from one, pulls it into the other, and checks it survives a reload. That test caught
+two real bugs on the way in:
+
+- `WA_PROGRESS.state` is exposed read-only on purpose (nothing outside `progress.js` should be able
+  to replace it by assignment) — which meant the sync client's first attempt to apply a pulled
+  snapshot threw immediately. Fixed with a proper `replaceState()` that merges onto `defaults()`, the
+  same pattern `load()` already used, so an older snapshot missing a field this version added
+  doesn't come back with holes in it.
+- The pull path unwrapped the server's response envelope wrong — a stale double-wrap left over from
+  an earlier draft — so a "successful" pull silently applied an empty state. The integration test is
+  what caught it; two isolated unit tests of push and pull each passing individually did not, because
+  the bug was only visible in the shape crossing the boundary between them.
+
+**CORS is on deliberately, wide open** (`Access-Control-Allow-Origin: *` on `/api/*`). The app is not
+necessarily served *by* this process — it might be the GitHub-hosted copy, or the offline-cached PWA,
+pointed at a server running on another machine entirely as its sync target — so every real call is
+cross-origin, and a JSON `PUT` triggers a CORS preflight. There is no cookie or credential involved to
+leak by allowing any origin to ask it a question; the wildcard is the correct choice for what this is,
+not a shortcut taken to make a test pass.
+
+```bash
+node weld-academy/tools/test-server.mjs              # 22 checks against the server alone
+node weld-academy/tools/test-sync-integration.mjs     # 10 checks, real two-device round trip
+```
+
+---
+
 ## Honest limits
 
 **This is not a qualification.** No certificate, no accreditation, no ticket. What it teaches is the
@@ -335,15 +397,20 @@ weld-academy/
   js/tally.js                her scales, spot vs yard, fuel costs, what she actually made
   js/dolls.js                the collection, drawn as inline SVG
   js/personal.js             every personal touch, in one file, as replaceable slots
+  js/sync.js                 optional cross-device sync client, talks to server/
   js/market.js               metal and Bitcoin prices, cached and offline-safe
   js/app.js                  router, views, event wiring
+  server/index.js            optional: sync + the AI proxy. Zero npm dependencies.
   tools/validate-content.mjs content integrity checks
   tools/check-links.mjs      the sources page's links, checked for real over the network
   tools/e2e-smoke.cjs        full browser walkthrough
+  tools/test-server.mjs      the optional server, tested alone
+  tools/test-sync-integration.mjs   real two-device sync round trip
 ```
 
-No dependencies, no bundler, no framework. Plain `<script src>` (not ES modules) so it works opened
-straight from disk.
+No dependencies, no bundler, no framework, in the app itself. Plain `<script src>` (not ES modules)
+so it works opened straight from disk. The optional server has no dependencies either — only Node's
+own built-ins.
 
 ---
 

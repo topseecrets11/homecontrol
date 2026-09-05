@@ -73,6 +73,9 @@ window.WA_PROGRESS = (function () {
       storageOK = false;
       console.warn('Weld Academy: could not save progress —', e && e.name);
     }
+    // localStorage stays the source of truth regardless; this is only ever
+    // an opportunistic, debounced, best-effort echo of it — see js/sync.js.
+    if (window.WA_SYNC) window.WA_SYNC.scheduleAutoPush();
   }
 
   function load() {
@@ -91,6 +94,24 @@ window.WA_PROGRESS = (function () {
       console.warn('Weld Academy: storage unavailable, running in memory only.');
     }
     return state;
+  }
+
+  /* Wholesale replace the state — what a sync pull needs. `state` is exposed
+     to the rest of the app as a getter-only accessor (see the return block
+     below), specifically so nothing outside this module can do exactly this
+     by assignment; this function is the one sanctioned way in, and it goes
+     through the same merge-onto-defaults as load() so a snapshot saved by an
+     older version of the app (missing a field this version added) does not
+     hand back a state object with holes in it. */
+  function replaceState(incoming) {
+    if (!incoming || typeof incoming !== 'object') return false;
+    var base = defaults();
+    Object.keys(base).forEach(function (k) {
+      if (incoming[k] !== undefined && incoming[k] !== null) base[k] = incoming[k];
+    });
+    state = base;
+    save();
+    return true;
   }
 
   /* --------------------------------------------------------------- levels */
@@ -498,6 +519,7 @@ window.WA_PROGRESS = (function () {
   return {
     XP: XP,
     load: load,
+    replaceState: replaceState,
     save: save,
     get state() { return state; },
     todayKey: todayKey,
