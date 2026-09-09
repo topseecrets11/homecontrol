@@ -33,6 +33,7 @@
   var PERSONAL = window.WA_PERSONAL;
   var SY = window.WA_SYNC;
   var OM = window.WA_OLDMATE;
+  var DA = window.WA_DEFECT_ART;
 
   var view, header, tabbar, toastHost;
   var autoReadTimer = null;        // pending auto-start of the reader
@@ -1607,6 +1608,10 @@
     if (!d) return;
     openSheet(d.icon + ' ' + d.name,
       '<p class="dx-sev">' + esc(d.severity) + '</p>' +
+      // The picture goes above the words, not below them. She opened this
+      // holding the real thing and the only question she has is whether hers
+      // matches — reading three paragraphs first is the wrong order.
+      (DA.has(id) ? DA.get(id) : '') +
       '<p class="dx-plain">' + esc(d.plain) + '</p>' +
       '<div class="dx-sec"><b>Why it happened</b><ul>' +
         d.causes.map(function (c) { return '<li>' + esc(c) + '</li>'; }).join('') + '</ul></div>' +
