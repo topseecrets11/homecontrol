@@ -810,6 +810,15 @@ function check(name, cond, extra) {
   }));
   // The one wink in the app was a bare 🦄, which made it look like every other
   // emoji in here rather than like something put there on purpose.
+  // Mick's own character art, with the drawn one kept as the fallback so a
+  // failed image load leaves a celebration with something in it, not a gap.
+  check("the unicorn egg uses Mick's own character, not my stand-in",
+    await page.evaluate(() => {
+      const html = WA_PERSONAL.unicornCharacter(170);
+      return /<img/.test(html) && html.includes('img/mick-unicorn.png') &&
+             /onerror=/.test(html) && html.includes('unicornArt');
+    }));
+
   check('the unicorn is actually drawn, and picks up her colours', await page.evaluate(() => {
     const art = WA_PERSONAL.unicornArt(120);
     return /^<svg/.test(art) && art.includes('var(--accent)') && art.includes('</svg>');

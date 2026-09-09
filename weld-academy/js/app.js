@@ -1025,7 +1025,7 @@
         J.celebrate({
           kind: 'complete',
           character: 'unicorn',
-          art: PERSONAL.unicornArt(132),
+          art: PERSONAL.unicornCharacter(170),
           kicker: 'First unit done',
           title: PERSONAL.unicorn().line,
           button: '🦄'
