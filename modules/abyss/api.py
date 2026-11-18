@@ -389,7 +389,8 @@ def register(k):
         except Exception:
             pass
 
-    k.hooks.update(verify_pattern=verify_pattern, open_vault=open_vault, close_vault=close_vault)
+    k.hooks.update(verify_pattern=verify_pattern, open_vault=open_vault, close_vault=close_vault,
+                   session_left=session_left)
 
     k.route("GET", "/api/abyss/status", status, role="tablet")
     k.route("POST", "/api/abyss/setup", setup, role="owner")

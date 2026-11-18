@@ -1,0 +1,615 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Storyboard</title>
+<style>
+:root { --bg:#070707; --grid:#141414; --card:#121212; --line:#2a2a2a; --ink:#e4e4dc; --dim:#7d7d72; --acc:#ffd400;
+        --t0:#ffd400; --t1:#ff8a3d; --t2:#ff5f7e; --t3:#a78bfa; --t4:#38bdf8; --t5:#34d399; }
+* { box-sizing:border-box; }
+html, body { margin:0; height:100%; background:var(--bg); color:var(--ink); font-family:'JetBrains Mono','DejaVu Sans Mono',monospace; overflow:hidden; font-size:12px; }
+button, input, select, textarea { font:inherit; font-size:12px; color:var(--ink); background:#0e0e0e; border:1px solid var(--line); border-radius:8px; padding:6px 9px; }
+button { cursor:pointer; } button:hover, button.on { border-color:var(--acc); color:var(--acc); }
+.hidden { display:none !important; }
+/* top bar */
+#bar { position:fixed; top:0; left:0; right:0; height:46px; display:flex; align-items:center; gap:8px; padding:0 10px; background:#0a0a0a; border-bottom:1px solid var(--line); z-index:20; }
+#bar .logo { color:var(--acc); letter-spacing:.3em; font-size:12px; margin-right:6px; }
+#bar .sp { flex:1; }
+#saved { color:var(--dim); font-size:11px; }
+/* canvas */
+#stage { position:fixed; top:46px; left:0; right:0; bottom:0; overflow:hidden; cursor:default;
+  background-color:var(--bg); background-image: radial-gradient(var(--grid) 1.2px, transparent 1.2px); }
+#world { position:absolute; left:0; top:0; transform-origin:0 0; }
+#wires { position:absolute; left:0; top:0; overflow:visible; pointer-events:none; }
+#wires path { fill:none; stroke:#555; stroke-width:2.2; pointer-events:stroke; cursor:pointer; }
+#wires path.sel { stroke:var(--acc); stroke-width:3; }
+#wires path.temp { stroke:var(--acc); stroke-dasharray:6 5; }
+/* nodes */
+.node { position:absolute; background:var(--card); border:1px solid var(--line); border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,.45); display:flex; flex-direction:column; }
+.node.sel { border-color:var(--acc); box-shadow:0 0 0 1px var(--acc), 0 8px 24px rgba(0,0,0,.5); }
+.node .hd { display:flex; align-items:center; gap:6px; padding:7px 9px; border-bottom:1px solid var(--line); cursor:grab; border-radius:12px 12px 0 0; }
+.node .hd .ic { color:var(--tag, var(--acc)); }
+.node .hd .ti { flex:1; min-width:0; background:transparent; border:0; padding:0; font-weight:600; color:var(--ink); outline:none; }
+.node .hd .ty { font-size:10px; color:var(--dim); letter-spacing:.1em; }
+.node .bd { flex:1; padding:8px; display:flex; flex-direction:column; gap:6px; min-height:0; overflow:hidden; }
+.node .pic { flex:1; min-height:60px; border-radius:8px; background:#0a0a0a center/contain no-repeat; border:1px dashed #333; display:flex; align-items:center; justify-content:center; color:var(--dim); font-size:11px; text-align:center; padding:6px; }
+.node .pic.has { border-style:solid; border-color:#222; color:transparent; }
+.node textarea, .node input.f { width:100%; resize:none; background:#0b0b0b; border-color:#222; padding:5px 7px; font-size:11px; }
+.node .chips { display:flex; gap:4px; flex-wrap:wrap; }
+.node .chips select, .node .chips input { padding:3px 6px; font-size:10px; width:auto; }
+.node .ft { padding:5px 9px; border-top:1px solid var(--line); color:var(--dim); font-size:10px; display:flex; justify-content:space-between; }
+.port { position:absolute; top:50%; width:14px; height:14px; margin-top:-7px; border-radius:50%; background:#1b1b1b; border:2px solid #666; cursor:crosshair; z-index:2; }
+.port.in { left:-8px; } .port.out { right:-8px; }
+.port:hover, .port.hot { border-color:var(--acc); background:#3a3200; }
+.rs { position:absolute; right:2px; bottom:2px; width:12px; height:12px; cursor:nwse-resize; border-right:2px solid #444; border-bottom:2px solid #444; border-radius:0 0 8px 0; }
+.node.note { background:#1c1a0e; } .node.note .hd { border-bottom-color:#3a3410; }
+/* palette */
+#pal { position:fixed; z-index:30; width:260px; background:#0d0d0d; border:1px solid var(--acc); border-radius:12px; padding:8px; box-shadow:0 12px 30px rgba(0,0,0,.6); }
+#pal input { width:100%; margin-bottom:6px; }
+#pal .it { padding:6px 8px; border-radius:6px; cursor:pointer; display:flex; gap:8px; }
+#pal .it:hover, #pal .it.cur { background:#1d1a05; color:var(--acc); }
+#pal .it small { color:var(--dim); margin-left:auto; }
+/* minimap */
+#mini { position:fixed; right:12px; bottom:12px; width:200px; height:130px; background:rgba(10,10,10,.9); border:1px solid var(--line); border-radius:10px; z-index:15; cursor:pointer; }
+/* views */
+#grid { position:fixed; top:46px; left:0; right:0; bottom:0; overflow:auto; padding:18px; display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:16px; align-content:start; }
+.card { background:var(--card); border:1px solid var(--line); border-radius:12px; overflow:hidden; cursor:grab; }
+.card .im { height:150px; background:#0a0a0a center/cover no-repeat; display:flex; align-items:flex-start; justify-content:flex-start; }
+.card .im b { background:var(--acc); color:#000; font-size:11px; padding:2px 8px; border-radius:0 0 8px 0; }
+.card .tx { padding:8px 10px; font-size:11px; line-height:1.45; } .card .tx .n { color:var(--acc); font-weight:600; }
+.card.drag { opacity:.4; }
+#seq { position:fixed; top:46px; left:0; right:0; bottom:0; display:flex; flex-direction:column; }
+#screen { flex:1; display:flex; align-items:center; justify-content:center; background:#000; position:relative; }
+#screen .shot { max-width:92%; max-height:88%; border-radius:6px; }
+#screen .cap { position:absolute; bottom:22px; left:50%; transform:translateX(-50%); max-width:80%; text-align:center; background:rgba(0,0,0,.65); padding:8px 14px; border-radius:8px; font-size:14px; }
+#strip { display:flex; gap:4px; padding:8px; overflow-x:auto; border-top:1px solid var(--line); background:#0a0a0a; }
+#strip .s { flex:none; height:56px; border-radius:6px; background:#151515 center/cover no-repeat; border:2px solid transparent; position:relative; cursor:pointer; }
+#strip .s.on { border-color:var(--acc); }
+#strip .s span { position:absolute; bottom:2px; right:4px; font-size:10px; background:rgba(0,0,0,.6); padding:0 4px; border-radius:4px; }
+#ctrls { display:flex; gap:8px; align-items:center; padding:8px 10px; border-top:1px solid var(--line); }
+/* lock / projects */
+#gate { position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; z-index:40; background:var(--bg); padding:20px; text-align:center; }
+#gate h1 { color:var(--acc); letter-spacing:.4em; font-size:15px; margin:0; }
+#gate p { color:var(--dim); max-width:420px; line-height:1.5; margin:0; }
+#plist { display:flex; flex-direction:column; gap:6px; min-width:300px; }
+#plist button { text-align:left; display:flex; justify-content:space-between; }
+#toast { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); color:var(--acc); z-index:50; font-size:12px; }
+</style>
+</head>
+<body>
+<div id="gate"><h1>STORYBOARD</h1><p id="gmsg">Loading…</p><div id="plist"></div>
+  <div class="row" id="newrow"><input id="pname" placeholder="New storyboard name"> <select id="tpl"><option value="three">Simple 3-shot storyboard</option><option value="blank">Start from scratch</option></select> <button id="pnew">Create</button></div>
+</div>
+
+<div id="bar" class="hidden">
+  <span class="logo">STORYBOARD</span><b id="ptitle"></b>
+  <button id="v-canvas" class="on">Canvas</button><button id="v-grid">Storyboard</button><button id="v-seq">Sequence</button>
+  <span class="sp"></span>
+  <button id="b-add" title="Add node (Tab, or double-click the canvas)">＋ Node</button>
+  <button id="b-fit" title="Zoom to fit (F)">Fit</button>
+  <button id="b-snap" title="Named snapshot of the whole board">Snapshot</button>
+  <select id="snaps" title="Restore a snapshot"><option value="">Snapshots…</option></select>
+  <button id="b-projects">Projects</button>
+  <span id="saved"></span>
+</div>
+
+<div id="stage" class="hidden"><div id="world"><svg id="wires" width="1" height="1"></svg></div></div>
+<canvas id="mini" class="hidden"></canvas>
+<div id="grid" class="hidden"></div>
+<div id="seq" class="hidden"><div id="screen"><img class="shot" id="shot"><div class="cap" id="cap"></div></div>
+  <div id="ctrls"><button id="play">▶ Play</button><button id="prev">⏮</button><button id="next">⏭</button><span id="sinfo" style="color:var(--dim)"></span></div>
+  <div id="strip"></div></div>
+<div id="pal" class="hidden"><input id="pq" placeholder="Add node…"><div id="pitems"></div></div>
+<div id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  function el(t, c, x) { var e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; }
+  function toast(t) { $('toast').textContent = t; clearTimeout(toast.t); toast.t = setTimeout(function () { $('toast').textContent = ''; }, 2600); }
+  function api(url, opts) {
+    opts = opts || {}; opts.credentials = 'same-origin';
+    if (opts.json !== undefined) { opts.headers = { 'Content-Type': 'application/json' }; opts.body = JSON.stringify(opts.json); }
+    return fetch(url, opts).then(function (r) { return r.json().then(function (j) { if (!j.ok) { var e = new Error(j.error || 'failed'); e.status = r.status; throw e; } return j; }); });
+  }
+
+  // ---------------------------------------------------------------- node types
+  var TYPES = {
+    shot:  { name: 'Shot', ic: '▣', w: 260, h: 250, pic: true, desc: 'Storyboard panel: picture, caption, shot, duration, dialogue', fields: ['caption', 'dialogue'] },
+    image: { name: 'Image', ic: '◩', w: 220, h: 190, pic: true, desc: 'A picture or reference frame' },
+    character: { name: 'Character', ic: '☺', w: 230, h: 220, pic: true, desc: 'A character with reference picture + notes', fields: ['notes'] },
+    background: { name: 'Background', ic: '▤', w: 250, h: 190, pic: true, desc: 'Scene background / plate' },
+    note:  { name: 'Note', ic: '✎', w: 220, h: 140, desc: 'Free text, sticky note, section title', fields: ['notes'] },
+    reference: { name: 'Reference', ic: '⌘', w: 220, h: 150, desc: 'Link with source & licence', fields: ['url', 'notes'] },
+    sequence: { name: 'Sequence', ic: '▶', w: 210, h: 120, desc: 'Plays connected shots in order (animatic)' }
+  };
+  var SHOT_TYPES = ['WIDE', 'MED', 'CLOSE', 'XCU', 'OTS', 'POV', 'INSERT'];
+  var TAGS = ['var(--t0)', 'var(--t1)', 'var(--t2)', 'var(--t3)', 'var(--t4)', 'var(--t5)'];
+
+  // ---------------------------------------------------------------- state
+  var P = null;                       // project name
+  var G = { nodes: [], wires: [], view: { x: 60, y: 40, z: 1 }, snapshots: [] };
+  var sel = {}, selWire = null, dirty = false, saveT = null;
+  var stage = $('stage'), world = $('world'), svg = $('wires');
+  var nodeEls = {};
+
+  function uid() { return Math.random().toString(36).slice(2, 9); }
+  function node(id) { for (var i = 0; i < G.nodes.length; i++) if (G.nodes[i].id === id) return G.nodes[i]; }
+  function touch() {
+    dirty = true; $('saved').textContent = 'saving…';
+    clearTimeout(saveT); saveT = setTimeout(save, 900);
+  }
+  function save(snapshotLabel) {
+    if (!P) return Promise.resolve();
+    var body = { name: P, graph: G }; if (snapshotLabel) body.snapshot = snapshotLabel;
+    return api('/api/storyboard/project', { method: 'PUT', json: body }).then(function () {
+      dirty = false; $('saved').textContent = 'saved ' + new Date().toLocaleTimeString().slice(0, 5);
+    }).catch(function (e) { $('saved').textContent = 'not saved: ' + e.message; if (e.status === 423) gate(e.message); });
+  }
+
+  // ---------------------------------------------------------------- render nodes
+  function picUrl(f) { return '/api/storyboard/picture?project=' + encodeURIComponent(P) + '&file=' + encodeURIComponent(f); }
+
+  function buildNode(n) {
+    var T = TYPES[n.type] || TYPES.note;
+    var d = el('div', 'node ' + n.type); d.dataset.id = n.id;
+    d.style.setProperty('--tag', TAGS[n.tag || 0]);
+    var hd = el('div', 'hd');
+    var ic = el('span', 'ic', T.ic); ic.title = 'Click to change colour tag';
+    ic.onclick = function (e) { e.stopPropagation(); n.tag = ((n.tag || 0) + 1) % TAGS.length; d.style.setProperty('--tag', TAGS[n.tag]); touch(); };
+    var ti = el('input', 'ti'); ti.value = n.title || T.name; ti.oninput = function () { n.title = ti.value; touch(); renderSideViews(); };
+    hd.appendChild(ic); hd.appendChild(ti); hd.appendChild(el('span', 'ty', T.name.toUpperCase()));
+    d.appendChild(hd);
+    var bd = el('div', 'bd');
+    if (T.pic) {
+      var pic = el('div', 'pic', 'Drop a picture here\nor click to choose');
+      function showPic() { if (n.img) { pic.style.backgroundImage = 'url("' + picUrl(n.img) + '")'; pic.classList.add('has'); } }
+      showPic();
+      pic.onclick = function () { var f = el('input'); f.type = 'file'; f.accept = 'image/*'; f.onchange = function () { if (f.files[0]) upload(f.files[0], n, showPic); }; f.click(); };
+      pic.ondragover = function (e) { e.preventDefault(); pic.style.borderColor = 'var(--acc)'; };
+      pic.ondragleave = function () { pic.style.borderColor = ''; };
+      pic.ondrop = function (e) { e.preventDefault(); e.stopPropagation(); pic.style.borderColor = ''; if (e.dataTransfer.files[0]) upload(e.dataTransfer.files[0], n, showPic); };
+      bd.appendChild(pic);
+    }
+    if (n.type === 'shot') {
+      var ch = el('div', 'chips');
+      var st = el('select'); SHOT_TYPES.forEach(function (s) { var o = el('option', null, s); if (n.shot === s) o.selected = true; st.appendChild(o); });
+      st.onchange = function () { n.shot = st.value; touch(); }; if (!n.shot) n.shot = 'MED';
+      var du = el('input'); du.type = 'number'; du.min = 0.2; du.step = 0.1; du.value = n.dur || 2; du.title = 'Seconds'; du.style.width = '64px';
+      du.oninput = function () { n.dur = parseFloat(du.value) || 2; touch(); };
+      ch.appendChild(st); ch.appendChild(du); ch.appendChild(el('span', 'ty', 's'));
+      bd.appendChild(ch);
+    }
+    (T.fields || []).forEach(function (f) {
+      var ta = el(f === 'url' ? 'input' : 'textarea', f === 'url' ? 'f' : null);
+      ta.placeholder = { caption: 'Caption / action', dialogue: 'Dialogue · camera note', notes: 'Notes', url: 'https://…' }[f];
+      if (f !== 'url') ta.rows = f === 'notes' && n.type === 'note' ? 4 : 2;
+      ta.value = n[f] || ''; ta.oninput = function () { n[f] = ta.value; touch(); renderSideViews(); };
+      bd.appendChild(ta);
+    });
+    if (n.type === 'sequence') {
+      var pb = el('button', null, '▶ Play the story'); pb.onclick = function () { setView('seq'); play(true); }; bd.appendChild(pb);
+    }
+    d.appendChild(bd);
+    var ft = el('div', 'ft'); ft.appendChild(el('span', null, T.name)); var info = el('span'); ft.appendChild(info); d.appendChild(ft);
+    d._info = info;
+    if (n.type !== 'note' && n.type !== 'reference') { var pin = el('div', 'port in'); pin.dataset.port = 'in'; d.appendChild(pin); }
+    if (n.type !== 'sequence') { var pout = el('div', 'port out'); pout.dataset.port = 'out'; d.appendChild(pout); }
+    var rs = el('div', 'rs'); d.appendChild(rs);
+    // interactions
+    hd.onpointerdown = function (e) { if (e.target === ti && document.activeElement === ti) return; startDrag(e, n); };
+    d.onpointerdown = function (e) { if (!e.shiftKey && !sel[n.id]) select([n.id]); else if (e.shiftKey) toggleSel(n.id); e.stopPropagation(); };
+    rs.onpointerdown = function (e) { e.stopPropagation(); startResize(e, n); };
+    d.querySelectorAll('.port').forEach(function (p) { p.onpointerdown = function (e) { e.stopPropagation(); startWire(e, n, p.dataset.port); }; });
+    return d;
+  }
+
+  function place(n) {
+    var d = nodeEls[n.id];
+    d.style.left = n.x + 'px'; d.style.top = n.y + 'px'; d.style.width = n.w + 'px'; d.style.height = n.h + 'px';
+    d.classList.toggle('sel', !!sel[n.id]);
+  }
+
+  function renderAll() {
+    world.querySelectorAll('.node').forEach(function (e) { e.remove(); });
+    nodeEls = {};
+    G.nodes.forEach(function (n) { var d = buildNode(n); nodeEls[n.id] = d; world.appendChild(d); place(n); });
+    applyView(); drawWires(); drawMini(); refreshInfo();
+  }
+
+  function refreshInfo() {
+    G.nodes.forEach(function (n) {
+      var d = nodeEls[n.id]; if (!d) return;
+      var ins = G.wires.filter(function (w) { return w.to === n.id; }).length, outs = G.wires.filter(function (w) { return w.from === n.id; }).length;
+      d._info.textContent = n.type === 'sequence' ? orderedShots().length + ' shots · ' + totalDur().toFixed(1) + 's' : (ins + ' in · ' + outs + ' out');
+    });
+  }
+
+  // ---------------------------------------------------------------- view (pan/zoom)
+  function applyView() {
+    var v = G.view;
+    world.style.transform = 'translate(' + v.x + 'px,' + v.y + 'px) scale(' + v.z + ')';
+    stage.style.backgroundPosition = v.x + 'px ' + v.y + 'px';
+    stage.style.backgroundSize = (24 * v.z) + 'px ' + (24 * v.z) + 'px';
+  }
+  function toWorld(cx, cy) { var r = stage.getBoundingClientRect(); return [(cx - r.left - G.view.x) / G.view.z, (cy - r.top - G.view.y) / G.view.z]; }
+  stage.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    var r = stage.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+    var z0 = G.view.z, z1 = Math.max(0.1, Math.min(4, z0 * Math.exp(-e.deltaY * 0.0015)));
+    G.view.x = mx - (mx - G.view.x) * z1 / z0; G.view.y = my - (my - G.view.y) * z1 / z0; G.view.z = z1;
+    applyView(); drawMini(); touch();
+  }, { passive: false });
+
+  var drag = null, space = false;
+  stage.addEventListener('pointerdown', function (e) {
+    if (e.target !== stage && e.target !== world && e.target !== svg) return;
+    selWire = null; drawWires();
+    if (e.button === 1 || space || e.button === 0 && !e.shiftKey) {
+      drag = { kind: 'pan', x: e.clientX, y: e.clientY, vx: G.view.x, vy: G.view.y, moved: 0 };
+      if (!e.shiftKey) select([]);
+    }
+    if (e.shiftKey && e.button === 0) {
+      var p = toWorld(e.clientX, e.clientY);
+      drag = { kind: 'band', x0: p[0], y0: p[1], el: el('div') };
+      drag.el.style.cssText = 'position:absolute;border:1px dashed var(--acc);background:rgba(255,212,0,.06);pointer-events:none';
+      world.appendChild(drag.el);
+    }
+    stage.setPointerCapture(e.pointerId);
+  });
+  stage.addEventListener('dblclick', function (e) {
+    if (e.target !== stage && e.target !== world) return;
+    palette(e.clientX, e.clientY, toWorld(e.clientX, e.clientY));
+  });
+
+  function startDrag(e, n) {
+    if (!sel[n.id]) select([n.id]);
+    var p = toWorld(e.clientX, e.clientY);
+    drag = { kind: 'move', x: p[0], y: p[1], start: Object.keys(sel).map(function (id) { var m = node(id); return [m, m.x, m.y]; }) };
+    stage.setPointerCapture(e.pointerId);
+  }
+  function startResize(e, n) {
+    var p = toWorld(e.clientX, e.clientY);
+    drag = { kind: 'resize', n: n, x: p[0], y: p[1], w: n.w, h: n.h };
+    stage.setPointerCapture(e.pointerId);
+  }
+  var tempWire = null;
+  function startWire(e, n, side) {
+    drag = { kind: 'wire', from: n, side: side };
+    tempWire = document.createElementNS('http://www.w3.org/2000/svg', 'path'); tempWire.setAttribute('class', 'temp'); svg.appendChild(tempWire);
+    stage.setPointerCapture(e.pointerId);
+  }
+
+  stage.addEventListener('pointermove', function (e) {
+    if (!drag) return;
+    if (drag.kind === 'pan') {
+      G.view.x = drag.vx + e.clientX - drag.x; G.view.y = drag.vy + e.clientY - drag.y; drag.moved++;
+      applyView(); drawMini();
+    } else if (drag.kind === 'move') {
+      var p = toWorld(e.clientX, e.clientY), dx = p[0] - drag.x, dy = p[1] - drag.y;
+      drag.start.forEach(function (s) { s[0].x = Math.round((s[1] + dx) / 8) * 8; s[0].y = Math.round((s[2] + dy) / 8) * 8; place(s[0]); });
+      drawWires(); drawMini();
+    } else if (drag.kind === 'resize') {
+      var q = toWorld(e.clientX, e.clientY);
+      drag.n.w = Math.max(160, drag.w + q[0] - drag.x); drag.n.h = Math.max(90, drag.h + q[1] - drag.y); place(drag.n); drawWires();
+    } else if (drag.kind === 'wire') {
+      var a = portPos(drag.from, drag.side), b = toWorld(e.clientX, e.clientY);
+      tempWire.setAttribute('d', drag.side === 'out' ? curve(a, b) : curve(b, a));
+      document.querySelectorAll('.port.hot').forEach(function (p) { p.classList.remove('hot'); });
+      var t = document.elementFromPoint(e.clientX, e.clientY);
+      if (t && t.classList.contains('port') && t.dataset.port !== drag.side) t.classList.add('hot');
+    } else if (drag.kind === 'band') {
+      var c = toWorld(e.clientX, e.clientY), x = Math.min(c[0], drag.x0), y = Math.min(c[1], drag.y0), w = Math.abs(c[0] - drag.x0), h = Math.abs(c[1] - drag.y0);
+      drag.el.style.left = x + 'px'; drag.el.style.top = y + 'px'; drag.el.style.width = w + 'px'; drag.el.style.height = h + 'px';
+      drag.box = [x, y, x + w, y + h];
+    }
+  });
+  stage.addEventListener('pointerup', function (e) {
+    if (!drag) return;
+    if (drag.kind === 'move' || drag.kind === 'resize' || drag.kind === 'pan') touch();
+    if (drag.kind === 'wire') {
+      tempWire.remove(); tempWire = null;
+      document.querySelectorAll('.port.hot').forEach(function (p) { p.classList.remove('hot'); });
+      var t = document.elementFromPoint(e.clientX, e.clientY);
+      var targetEl = t && t.closest && t.closest('.node');
+      if (t && t.classList.contains('port') && targetEl && t.dataset.port !== drag.side) {
+        var other = node(targetEl.dataset.id);
+        connect(drag.side === 'out' ? drag.from : other, drag.side === 'out' ? other : drag.from);
+      } else if (!targetEl) {
+        // dropped on empty canvas: add a node there, already wired
+        var wp = toWorld(e.clientX, e.clientY), from = drag.from, side = drag.side;
+        palette(e.clientX, e.clientY, wp, function (nn) { side === 'out' ? connect(from, nn) : connect(nn, from); });
+      }
+    }
+    if (drag.kind === 'band') {
+      drag.el.remove();
+      if (drag.box) select(G.nodes.filter(function (n) { return n.x < drag.box[2] && n.x + n.w > drag.box[0] && n.y < drag.box[3] && n.y + n.h > drag.box[1]; }).map(function (n) { return n.id; }));
+    }
+    drag = null;
+  });
+
+  // ---------------------------------------------------------------- wires
+  function portPos(n, side) { return side === 'out' ? [n.x + n.w + 1, n.y + n.h / 2] : [n.x - 1, n.y + n.h / 2]; }
+  function curve(a, b) { var dx = Math.max(60, Math.abs(b[0] - a[0]) * 0.5); return 'M' + a[0] + ',' + a[1] + ' C' + (a[0] + dx) + ',' + a[1] + ' ' + (b[0] - dx) + ',' + b[1] + ' ' + b[0] + ',' + b[1]; }
+  function reaches(fromId, toId) {           // is toId downstream of fromId?
+    var seen = {}, stack = [fromId];
+    while (stack.length) { var c = stack.pop(); if (c === toId) return true; if (seen[c]) continue; seen[c] = 1;
+      G.wires.forEach(function (w) { if (w.from === c) stack.push(w.to); }); }
+    return false;
+  }
+  function connect(a, b) {
+    if (!a || !b || a === b) return;
+    if (a.type === 'sequence' || b.type === 'note' || b.type === 'reference') return toast('That node has no port on that side');
+    if (G.wires.some(function (w) { return w.from === a.id && w.to === b.id; })) return;
+    if (reaches(b.id, a.id)) { var d = nodeEls[b.id]; d.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-6px)' }, { transform: 'translateX(6px)' }, { transform: 'translateX(0)' }], 260); return toast('That would make a loop'); }
+    G.wires.push({ id: uid(), from: a.id, to: b.id }); drawWires(); refreshInfo(); renderSideViews(); touch();
+  }
+  function drawWires() {
+    svg.querySelectorAll('path:not(.temp)').forEach(function (p) { p.remove(); });
+    G.wires.forEach(function (w) {
+      var a = node(w.from), b = node(w.to); if (!a || !b) return;
+      var p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      p.setAttribute('d', curve(portPos(a, 'out'), portPos(b, 'in')));
+      if (selWire === w.id) p.setAttribute('class', 'sel');
+      p.onpointerdown = function (e) { e.stopPropagation(); if (e.altKey) { removeWire(w.id); return; } selWire = w.id; select([]); drawWires(); };
+      svg.insertBefore(p, svg.firstChild);
+    });
+  }
+  function removeWire(id) { G.wires = G.wires.filter(function (w) { return w.id !== id; }); selWire = null; drawWires(); refreshInfo(); renderSideViews(); touch(); }
+
+  // ---------------------------------------------------------------- selection + keys
+  function select(ids) { sel = {}; ids.forEach(function (i) { sel[i] = 1; }); G.nodes.forEach(place); }
+  function toggleSel(id) { if (sel[id]) delete sel[id]; else sel[id] = 1; G.nodes.forEach(place); }
+  function addNode(type, x, y, extra) {
+    var T = TYPES[type], n = Object.assign({ id: uid(), type: type, title: T.name, x: Math.round(x), y: Math.round(y), w: T.w, h: T.h, tag: 0 }, extra || {});
+    G.nodes.push(n); var d = buildNode(n); nodeEls[n.id] = d; world.appendChild(d); place(n); select([n.id]);
+    refreshInfo(); drawMini(); renderSideViews(); touch(); return n;
+  }
+  function removeSelected() {
+    var ids = Object.keys(sel); if (!ids.length && selWire) return removeWire(selWire);
+    G.nodes = G.nodes.filter(function (n) { return !sel[n.id]; });
+    G.wires = G.wires.filter(function (w) { return !sel[w.from] && !sel[w.to]; });
+    ids.forEach(function (i) { if (nodeEls[i]) nodeEls[i].remove(); delete nodeEls[i]; });
+    sel = {}; drawWires(); drawMini(); refreshInfo(); renderSideViews(); touch();
+  }
+  function duplicate() {
+    var map = {}, made = [];
+    Object.keys(sel).forEach(function (id) { var n = node(id), c = JSON.parse(JSON.stringify(n)); c.id = uid(); c.x += 32; c.y += 32; map[id] = c.id; G.nodes.push(c); made.push(c.id); });
+    G.wires.slice().forEach(function (w) { if (map[w.from] && map[w.to]) G.wires.push({ id: uid(), from: map[w.from], to: map[w.to] }); });
+    renderAll(); select(made); touch();
+  }
+  document.addEventListener('keydown', function (e) {
+    var typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
+    if (e.key === ' ' && !typing) space = true;
+    if (typing) { if (e.key === 'Escape') document.activeElement.blur(); return; }
+    if (curView !== 'canvas') { if (e.key === ' ' && curView === 'seq') { e.preventDefault(); play(); } return; }
+    if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); removeSelected(); }
+    else if (e.key === 'Tab') { e.preventDefault(); var r = stage.getBoundingClientRect(); palette(r.left + r.width / 2 - 130, r.top + 80, toWorld(r.left + r.width / 2, r.top + r.height / 2)); }
+    else if ((e.key === 'f' || e.key === 'F') && !e.ctrlKey) fit(e.shiftKey);
+    else if (e.ctrlKey && (e.key === 'd' || e.key === 'D')) { e.preventDefault(); duplicate(); }
+    else if (e.ctrlKey && (e.key === 'a' || e.key === 'A')) { e.preventDefault(); select(G.nodes.map(function (n) { return n.id; })); }
+    else if (e.ctrlKey && (e.key === 's' || e.key === 'S')) { e.preventDefault(); save(); }
+  });
+  document.addEventListener('keyup', function (e) { if (e.key === ' ') space = false; });
+
+  function fit(onlySel) {
+    var ns = onlySel ? G.nodes.filter(function (n) { return sel[n.id]; }) : G.nodes; if (!ns.length) return;
+    var x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    ns.forEach(function (n) { x0 = Math.min(x0, n.x); y0 = Math.min(y0, n.y); x1 = Math.max(x1, n.x + n.w); y1 = Math.max(y1, n.y + n.h); });
+    var r = stage.getBoundingClientRect(), z = Math.max(0.1, Math.min(1.5, Math.min((r.width - 80) / (x1 - x0), (r.height - 80) / (y1 - y0))));
+    G.view = { x: (r.width - (x1 - x0) * z) / 2 - x0 * z, y: (r.height - (y1 - y0) * z) / 2 - y0 * z, z: z };
+    applyView(); drawMini(); touch();
+  }
+
+  // ---------------------------------------------------------------- palette
+  var palCb = null;
+  function palette(cx, cy, wp, cb) {
+    palCb = cb || null;
+    var p = $('pal'); p.classList.remove('hidden');
+    p.style.left = Math.min(cx, innerWidth - 270) + 'px'; p.style.top = Math.min(cy, innerHeight - 300) + 'px';
+    p._wp = wp; $('pq').value = ''; drawPal(); $('pq').focus();
+  }
+  function drawPal() {
+    var q = $('pq').value.toLowerCase(), box = $('pitems'); box.textContent = '';
+    Object.keys(TYPES).filter(function (k) { return !q || (TYPES[k].name + ' ' + TYPES[k].desc).toLowerCase().indexOf(q) >= 0; }).forEach(function (k, i) {
+      var it = el('div', 'it' + (i === 0 ? ' cur' : '')); it.dataset.type = k;
+      it.appendChild(el('span', null, TYPES[k].ic)); it.appendChild(el('span', null, TYPES[k].name)); it.appendChild(el('small', null, k === 'shot' ? 'panel' : ''));
+      it.title = TYPES[k].desc; it.onclick = function () { pick(k); }; box.appendChild(it);
+    });
+  }
+  function pick(k) { var p = $('pal'), n = addNode(k, p._wp[0], p._wp[1]); p.classList.add('hidden'); if (palCb) palCb(n); palCb = null; }
+  $('pq').oninput = drawPal;
+  $('pq').onkeydown = function (e) {
+    if (e.key === 'Enter') { var c = document.querySelector('#pitems .it'); if (c) pick(c.dataset.type); }
+    if (e.key === 'Escape') $('pal').classList.add('hidden');
+  };
+  document.addEventListener('pointerdown', function (e) { if (!$('pal').contains(e.target)) $('pal').classList.add('hidden'); }, true);
+  $('b-add').onclick = function () { var r = stage.getBoundingClientRect(); palette(r.left + 60, r.top + 60, toWorld(r.left + r.width / 2, r.top + r.height / 2)); };
+  $('b-fit').onclick = function () { fit(false); };
+
+  // ---------------------------------------------------------------- minimap
+  function drawMini() {
+    var c = $('mini'), x = c.getContext('2d'), W = c.width = 200, H = c.height = 130; x.clearRect(0, 0, W, H);
+    if (!G.nodes.length) return;
+    var x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    G.nodes.forEach(function (n) { x0 = Math.min(x0, n.x); y0 = Math.min(y0, n.y); x1 = Math.max(x1, n.x + n.w); y1 = Math.max(y1, n.y + n.h); });
+    var s = Math.min((W - 16) / (x1 - x0 || 1), (H - 16) / (y1 - y0 || 1)); c._m = { x0: x0, y0: y0, s: s };
+    G.nodes.forEach(function (n) { x.fillStyle = sel[n.id] ? '#ffd400' : n.type === 'shot' ? '#6b5d00' : '#333'; x.fillRect(8 + (n.x - x0) * s, 8 + (n.y - y0) * s, Math.max(2, n.w * s), Math.max(2, n.h * s)); });
+    var r = stage.getBoundingClientRect(), vx = -G.view.x / G.view.z, vy = -G.view.y / G.view.z;
+    x.strokeStyle = '#ffd400'; x.strokeRect(8 + (vx - x0) * s, 8 + (vy - y0) * s, r.width / G.view.z * s, r.height / G.view.z * s);
+  }
+  $('mini').onpointerdown = function (e) {
+    var m = this._m; if (!m) return; var b = this.getBoundingClientRect(), r = stage.getBoundingClientRect();
+    var wx = (e.clientX - b.left - 8) / m.s + m.x0, wy = (e.clientY - b.top - 8) / m.s + m.y0;
+    G.view.x = r.width / 2 - wx * G.view.z; G.view.y = r.height / 2 - wy * G.view.z; applyView(); drawMini(); touch();
+  };
+
+  // ---------------------------------------------------------------- story order + side views
+  function orderedShots() {
+    // reading order: follow wires from shots that have no shot feeding them; unconnected shots by position
+    var shots = G.nodes.filter(function (n) { return n.type === 'shot'; }), ids = {}; shots.forEach(function (s) { ids[s.id] = s; });
+    var next = {}, hasPrev = {};
+    G.wires.forEach(function (w) { if (ids[w.from] && ids[w.to]) { (next[w.from] = next[w.from] || []).push(w.to); hasPrev[w.to] = 1; } });
+    var starts = shots.filter(function (s) { return !hasPrev[s.id]; }).sort(function (a, b) { return a.x - b.x || a.y - b.y; });
+    var out = [], seen = {};
+    function walk(s) { if (seen[s.id]) return; seen[s.id] = 1; out.push(s); (next[s.id] || []).map(function (i) { return ids[i]; }).sort(function (a, b) { return a.y - b.y; }).forEach(walk); }
+    starts.forEach(walk); shots.forEach(function (s) { if (!seen[s.id]) out.push(s); });
+    return out;
+  }
+  function totalDur() { return orderedShots().reduce(function (a, s) { return a + (s.dur || 2); }, 0); }
+
+  var curView = 'canvas';
+  function setView(v) {
+    curView = v;
+    ['canvas', 'grid', 'seq'].forEach(function (k) { $('v-' + k).classList.toggle('on', k === v); });
+    stage.classList.toggle('hidden', v !== 'canvas'); $('mini').classList.toggle('hidden', v !== 'canvas');
+    $('grid').classList.toggle('hidden', v !== 'grid'); $('seq').classList.toggle('hidden', v !== 'seq');
+    if (v !== 'seq') stop();
+    renderSideViews();
+  }
+  $('v-canvas').onclick = function () { setView('canvas'); };
+  $('v-grid').onclick = function () { setView('grid'); };
+  $('v-seq').onclick = function () { setView('seq'); };
+
+  function renderSideViews() {
+    refreshInfo();
+    if (curView === 'grid') {
+      var g = $('grid'); g.textContent = '';
+      var shots = orderedShots();
+      if (!shots.length) g.appendChild(el('div', null, 'No shots yet. Add Shot nodes on the canvas.'));
+      shots.forEach(function (s, i) {
+        var c = el('div', 'card'); c.draggable = true; c.dataset.id = s.id;
+        var im = el('div', 'im'); if (s.img) im.style.backgroundImage = 'url("' + picUrl(s.img) + '")';
+        im.appendChild(el('b', null, (i + 1) + ' · ' + (s.shot || 'MED') + ' · ' + (s.dur || 2) + 's'));
+        var tx = el('div', 'tx'); tx.appendChild(el('div', 'n', s.title || 'Shot'));
+        if (s.caption) tx.appendChild(el('div', null, s.caption)); if (s.dialogue) tx.appendChild(el('div', null, '“' + s.dialogue + '”'));
+        c.appendChild(im); c.appendChild(tx);
+        c.ondragstart = function () { c.classList.add('drag'); g._drag = s.id; };
+        c.ondragend = function () { c.classList.remove('drag'); };
+        c.ondragover = function (e) { e.preventDefault(); };
+        c.ondrop = function (e) { e.preventDefault(); reorder(g._drag, s.id); };
+        g.appendChild(c);
+      });
+    }
+    if (curView === 'seq') drawStrip();
+  }
+  function reorder(dragId, beforeId) {
+    // rebuild the shot chain in the new order: shot→shot wires become a single line
+    var order = orderedShots().map(function (s) { return s.id; }).filter(function (i) { return i !== dragId; });
+    order.splice(order.indexOf(beforeId), 0, dragId);
+    var shotIds = {}; order.forEach(function (i) { shotIds[i] = 1; });
+    G.wires = G.wires.filter(function (w) { return !(shotIds[w.from] && shotIds[w.to]); });
+    for (var i = 0; i < order.length - 1; i++) G.wires.push({ id: uid(), from: order[i], to: order[i + 1] });
+    var x = Math.min.apply(null, order.map(function (i) { return node(i).x; })), y = node(order[0]).y;
+    order.forEach(function (id, k) { var n = node(id); n.x = x + k * (n.w + 80); n.y = y; });
+    renderAll(); renderSideViews(); touch();
+  }
+
+  // ---------------------------------------------------------------- sequence (animatic)
+  var playing = false, idx = 0, timer = null;
+  function drawStrip() {
+    var shots = orderedShots(), st = $('strip'); st.textContent = '';
+    shots.forEach(function (s, i) {
+      var c = el('div', 's' + (i === idx ? ' on' : '')); c.style.width = Math.max(40, (s.dur || 2) * 40) + 'px';
+      if (s.img) c.style.backgroundImage = 'url("' + picUrl(s.img) + '")';
+      c.appendChild(el('span', null, (i + 1) + '')); c.onclick = function () { show(i); }; st.appendChild(c);
+    });
+    show(Math.min(idx, Math.max(0, shots.length - 1)));
+  }
+  function show(i) {
+    var shots = orderedShots(); idx = i; var s = shots[i];
+    $('shot').src = s && s.img ? picUrl(s.img) : ''; $('shot').style.visibility = s && s.img ? 'visible' : 'hidden';
+    $('cap').textContent = s ? [s.caption, s.dialogue ? '“' + s.dialogue + '”' : ''].filter(Boolean).join('  ') || s.title : 'No shots yet';
+    $('sinfo').textContent = shots.length ? 'shot ' + (i + 1) + ' / ' + shots.length + ' · ' + (s.dur || 2) + 's · total ' + totalDur().toFixed(1) + 's' : '';
+    document.querySelectorAll('#strip .s').forEach(function (c, k) { c.classList.toggle('on', k === i); });
+  }
+  function play(force) {
+    if (playing && !force) return stop();
+    var shots = orderedShots(); if (!shots.length) return;
+    playing = true; $('play').textContent = '⏸ Pause';
+    (function tick() {
+      show(idx); timer = setTimeout(function () { if (idx + 1 >= orderedShots().length) { idx = 0; return stop(); } idx++; tick(); }, (orderedShots()[idx].dur || 2) * 1000);
+    })();
+  }
+  function stop() { playing = false; clearTimeout(timer); $('play').textContent = '▶ Play'; }
+  $('play').onclick = function () { play(); };
+  $('prev').onclick = function () { stop(); show(Math.max(0, idx - 1)); };
+  $('next').onclick = function () { stop(); show(Math.min(orderedShots().length - 1, idx + 1)); };
+
+  // ---------------------------------------------------------------- pictures
+  function upload(file, n, done) {
+    toast('Saving picture into Abyss…');
+    fetch('/api/storyboard/picture?project=' + encodeURIComponent(P) + '&name=' + encodeURIComponent(file.name.replace(/[^\w .\-]/g, '_')),
+      { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/octet-stream' }, body: file })
+      .then(function (r) { return r.json(); }).then(function (j) {
+        if (!j.ok) return toast(j.error);
+        n.img = j.file; done(); renderSideViews(); touch(); toast('Saved (encrypted)');
+      });
+  }
+  stage.addEventListener('dragover', function (e) { e.preventDefault(); });
+  stage.addEventListener('drop', function (e) {     // drop pictures on empty canvas = new Image/Shot nodes
+    e.preventDefault(); var wp = toWorld(e.clientX, e.clientY);
+    [].slice.call(e.dataTransfer.files).filter(function (f) { return /^image\//.test(f.type); }).forEach(function (f, i) {
+      var n = addNode('shot', wp[0] + i * 300, wp[1]); upload(f, n, function () { place(n); var d = buildNode(n); nodeEls[n.id].replaceWith(d); nodeEls[n.id] = d; place(n); });
+    });
+  });
+
+  // ---------------------------------------------------------------- snapshots
+  function fillSnaps() {
+    var s = $('snaps'); s.length = 1;
+    (G.snapshots || []).slice().reverse().forEach(function (sn, i) { var o = el('option', null, new Date(sn.at * 1000).toLocaleString().slice(0, 16) + ' · ' + sn.label); o.value = G.snapshots.length - 1 - i; s.appendChild(o); });
+  }
+  $('b-snap').onclick = function () {
+    var label = prompt('Name this snapshot', 'Before changes'); if (!label) return;
+    save(label).then(function () { return api('/api/storyboard/project?name=' + encodeURIComponent(P)); }).then(function (j) { G.snapshots = j.graph.snapshots || []; fillSnaps(); toast('Snapshot saved'); });
+  };
+  $('snaps').onchange = function () {
+    var sn = G.snapshots[+this.value]; this.value = ''; if (!sn) return;
+    if (!confirm('Restore "' + sn.label + '"? (The current board is snapshotted first.)')) return;
+    save('Auto: before restoring ' + sn.label).then(function () { G.nodes = JSON.parse(JSON.stringify(sn.nodes)); G.wires = JSON.parse(JSON.stringify(sn.wires)); renderAll(); renderSideViews(); touch(); });
+  };
+
+  // ---------------------------------------------------------------- projects / gate
+  function template(kind) {
+    var g = { nodes: [], wires: [], view: { x: 60, y: 60, z: 0.9 }, snapshots: [] };
+    if (kind === 'three') {
+      var ids = [];
+      ['Opening', 'Turn', 'Payoff'].forEach(function (t, i) { var id = uid(); ids.push(id); g.nodes.push({ id: id, type: 'shot', title: t, x: 80 + i * 340, y: 120, w: 260, h: 250, shot: ['WIDE', 'MED', 'CLOSE'][i], dur: 2, tag: 0 }); });
+      g.nodes.push({ id: 'seq', type: 'sequence', title: 'Animatic', x: 80 + 3 * 340, y: 185, w: 210, h: 120, tag: 0 });
+      g.nodes.push({ id: uid(), type: 'note', title: 'Story', x: 80, y: -60, w: 300, h: 140, notes: 'One line: who wants what, what stops them.', tag: 0 });
+      g.wires.push({ id: uid(), from: ids[0], to: ids[1] }, { id: uid(), from: ids[1], to: ids[2] }, { id: uid(), from: ids[2], to: 'seq' });
+    }
+    return g;
+  }
+  function gate(msg) {
+    $('gate').classList.remove('hidden'); ['bar', 'stage', 'mini', 'grid', 'seq'].forEach(function (i) { $(i).classList.add('hidden'); });
+    $('gmsg').textContent = msg || 'Loading…'; $('plist').textContent = '';
+    api('/api/storyboard/projects').then(function (j) {
+      $('gmsg').textContent = j.projects.length ? 'Your storyboards (encrypted inside Abyss):' : 'No storyboards yet. Make the first one:';
+      $('newrow').classList.remove('hidden');
+      j.projects.forEach(function (p) { var b = el('button'); b.appendChild(el('span', null, p.name)); b.appendChild(el('span', 'ty', new Date(p.modified * 1000).toLocaleDateString())); b.onclick = function () { openProject(p.name); }; $('plist').appendChild(b); });
+    }).catch(function (e) { $('gmsg').textContent = e.message; $('newrow').classList.add('hidden'); });
+  }
+  function openProject(name, fresh) {
+    var go = function (g) {
+      P = name; G = g; G.view = G.view || { x: 60, y: 40, z: 1 }; G.snapshots = G.snapshots || [];
+      $('gate').classList.add('hidden'); $('bar').classList.remove('hidden'); $('ptitle').textContent = name;
+      setView('canvas'); renderAll(); fillSnaps(); $('saved').textContent = 'saved';
+    };
+    if (fresh) { go(fresh); save(); return; }
+    api('/api/storyboard/project?name=' + encodeURIComponent(name)).then(function (j) { go(j.graph); }).catch(function (e) { toast(e.message); });
+  }
+  $('pnew').onclick = function () {
+    var n = $('pname').value.trim(); if (!n) return $('pname').focus();
+    openProject(n, template($('tpl').value));
+  };
+  $('b-projects').onclick = function () { save().then(function () { gate(); }); };
+  window.addEventListener('beforeunload', function () { if (dirty) save(); });
+  window.addEventListener('resize', drawMini);
+  gate();
+})();
+</script>
+</body>
+</html>
