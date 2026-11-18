@@ -128,6 +128,9 @@ class Kernel:
             src = (m.meta.get("tab") or {}).get("src", "")
             if src.startswith("http://127.0.0.1:"):
                 frames.add("/".join(src.split("/", 3)[:3]))
+            for f in m.meta.get("frames", []):          # loopback apps a module embeds
+                if f.startswith("http://127.0.0.1:"):
+                    frames.add(f.rstrip("/"))
         frames = sorted(frames)
         self.csp = CSP.format(frames="".join(" " + f for f in frames))
         # pick up config/secret changes (e.g. a new HA token) without a restart

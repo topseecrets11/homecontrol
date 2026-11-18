@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Studio</title>
+<style>
+:root{--bg:#0a0a0a;--card:#131313;--line:#2a2a2a;--ink:#d8e6d8;--dim:#7a857c;--acc:#ffd400}
+*{box-sizing:border-box}html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:'JetBrains Mono','DejaVu Sans Mono',monospace}
+#home{padding:16px}h1{font-size:13px;letter-spacing:.3em;color:var(--acc);margin:0 0 4px}.sub{font-size:11px;color:var(--dim);margin:0 0 14px}
+#tools{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.t{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px}
+.t h2{margin:0;font-size:13px;color:var(--acc);letter-spacing:.08em}.t p{margin:0;font-size:11px;line-height:1.5;color:var(--dim);flex:1}
+.t .row{display:flex;gap:6px;flex-wrap:wrap}
+button{font:inherit;font-size:11px;padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:#0d0d0d;color:var(--ink);cursor:pointer}
+button:hover{border-color:var(--acc);color:var(--acc)}.soon{opacity:.45}
+#app{display:none;height:100%;flex-direction:column}#bar{display:flex;gap:8px;align-items:center;padding:6px 10px;border-bottom:1px solid var(--line)}
+#bar span{font-size:11px;color:var(--acc);letter-spacing:.2em;flex:1}#frame{flex:1;border:0;width:100%;background:#000}
+#msg{font-size:12px;color:#ff7a7a;min-height:1.2em;margin-top:10px}
+</style></head><body>
+<section id="home">
+  <h1>STUDIO</h1><p class="sub">Your animation and asset tools. They start on Beast when you open them and stop themselves when idle.</p>
+  <div id="tools"></div><div id="msg"></div>
+</section>
+<section id="app"><div id="bar"><button id="back">← Studio</button><span id="title"></span><button id="pop">Open in own window</button></div><iframe id="frame" allow="clipboard-write; fullscreen"></iframe></section>
+<script>
+(function(){
+  var TOOLS=[
+    {id:'framegrabber',view:'grabber',name:'Frame Grabber',text:'Grab frames, GIFs and clips from video, label them, cut out models, split body parts, filters, upscale.'},
+    {id:'framegrabber',view:'gallery',name:'Gallery',text:'Frame Grabber’s light picture review: sets, all pictures, add your own.'},
+    {id:'riggallery',view:'',name:'Rig Gallery',text:'Assets, rigs, poses and animation sequences in one catalogue. Export to Lottie.'},
+    {id:'storyboard',name:'Storyboard',text:'The node storyboard canvas from your Frame Grabber Studio design. Being built next.',soon:true},
+    {id:'vectorrig',name:'VectorRig Studio',text:'Crop, catalogue, movement library, costume matching, rig export (Electron). Needs a build first.',soon:true}
+  ];
+  var cur=null;
+  function $(i){return document.getElementById(i)}
+  function el(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e}
+  TOOLS.forEach(function(t){
+    var c=el('div','t'+(t.soon?' soon':''));c.appendChild(el('h2',null,t.name));c.appendChild(el('p',null,t.text));
+    var r=el('div','row');var b=el('button',null,t.soon?'Coming':'Open');
+    if(!t.soon)b.onclick=function(){open(t)};r.appendChild(b);c.appendChild(r);$('tools').appendChild(c);
+  });
+  function open(t){
+    $('msg').textContent='Starting '+t.name+'…';
+    fetch('/api/studio/open',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:t.id,view:t.view})})
+    .then(function(r){return r.json()}).then(function(j){
+      if(!j.ok){$('msg').textContent=j.error;return}
+      cur=(j.result||j).url;$('msg').textContent='';$('title').textContent=t.name.toUpperCase();
+      $('frame').src=cur;$('home').style.display='none';$('app').style.display='flex';
+    }).catch(function(){$('msg').textContent='Beast OS did not answer'});
+  }
+  $('back').onclick=function(){$('frame').src='about:blank';$('app').style.display='none';$('home').style.display='block'};
+  $('pop').onclick=function(){if(cur)window.open(cur,'_blank')};
+})();
+</script></body></html>

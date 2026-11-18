@@ -1,0 +1,9 @@
+{
+  "id": "studio",
+  "title": "Studio",
+  "tab": {"label": "STUDIO", "icon": "◧", "order": 12, "view": "frame", "src": "/m/studio/"},
+  "role": "owner",
+  "modes": ["vault", "normal"],
+  "frames": ["http://127.0.0.1:8781", "http://127.0.0.1:8782", "http://127.0.0.1:4177"],
+  "web": "web"
+}

@@ -258,7 +258,7 @@
     b.title = a[2] + ' opens on Beast with no network; it works inside this Abyss folder (~/AbyssWork in the app)';
     b.onclick = function () {
       api('/api/abyss/run', { json: { app: a[0], sub: path } })
-        .then(function (j) { $('timer').textContent = a[2] + ' opening… saves → Abyss/' + j.result.saves_to; })
+        .then(function (j) { $('timer').textContent = a[2] + ' opening… saves → Abyss/' + (j.result || j).saves_to; })
         .catch(function (e) { alert(e.message); });
     };
     $('apps').appendChild(b);
