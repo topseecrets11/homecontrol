@@ -130,6 +130,20 @@ class Kernel:
                 frames.add("/".join(src.split("/", 3)[:3]))
         frames = sorted(frames)
         self.csp = CSP.format(frames="".join(" " + f for f in frames))
+        # pick up config/secret changes (e.g. a new HA token) without a restart
+        self._cfg_mtime = self._cfg_stamp()
+        every(10, self._watch_config)
+
+    def _cfg_stamp(self):
+        return tuple(os.path.getmtime(os.path.join(HOME, n)) if os.path.exists(os.path.join(HOME, n)) else 0
+                     for n in ("beast.json", "secrets.json"))
+
+    def _watch_config(self):
+        st = self._cfg_stamp()
+        if st != self._cfg_mtime:
+            self._cfg_mtime = st
+            self.reload_config()
+            log("config reloaded")
 
     # ---- module API
     def route(self, method, path, fn, role="owner", prefix=False, max_body=MAX_JSON, stream=False):

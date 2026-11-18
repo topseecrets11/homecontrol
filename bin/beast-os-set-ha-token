@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Give Beast OS your Home Assistant token without it ever touching a chat or the terminal.
+# Opens HA on the Event at your profile's Security page + a hidden-input box.
+set -euo pipefail
+export DISPLAY="${DISPLAY:-:0}"
+HA=$(python3 -I -c "import json,os;print(json.load(open(os.path.expanduser('~/.config/beast-os/beast.json')))['homeassistant']['url'])")
+xdg-open "$HA/profile/security" >/dev/null 2>&1 || true
+ASK=(--title="Beast OS: Home Assistant token" --width=560 --center --on-top)
+TEXT="In Home Assistant (just opened), scroll to the bottom: Long-lived access tokens, then Create token.\nName it Beast OS, copy the long text (it's shown once), paste it here."
+if command -v yad >/dev/null; then
+  TOKEN=$(yad "${ASK[@]}" --text="$TEXT" --entry --hide-text --button="Cancel:1" --button="OK:0" 2>/dev/null || true)
+else
+  TOKEN=$(zenity --password --title="Beast OS: Home Assistant token" 2>/dev/null || true)
+fi
+TOKEN=$(printf '%s' "$TOKEN" | tr -d '[:space:]')
+[ "${#TOKEN}" -gt 40 ] || { notify-send "Beast OS" "No token saved."; exit 1; }
+CODE=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TOKEN" "$HA/api/")
+if [ "$CODE" != "200" ]; then notify-send "Beast OS" "Home Assistant said $CODE to that token. Nothing saved."; exit 1; fi
+TOKEN="$TOKEN" python3 -I - <<'PY'
+import json, os
+p = os.path.expanduser("~/.config/beast-os/secrets.json")
+d = json.load(open(p)) if os.path.exists(p) else {}
+d.setdefault("homeassistant", {})["token"] = os.environ["TOKEN"]
+fd = os.open(p + ".new", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+with os.fdopen(fd, "w") as f: json.dump(d, f, indent=2)
+os.replace(p + ".new", p)
+PY
+sleep 11   # Beast OS notices the new token by itself
+notify-send "Beast OS" "Home Assistant connected. The Node and the blob are live."

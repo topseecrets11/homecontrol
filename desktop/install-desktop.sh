@@ -58,3 +58,11 @@ systemctl --user daemon-reload
 systemctl --user enable --now abyss-agent.service
 update-desktop-database "$A" 2>/dev/null || true
 echo "Menu: Beast OS, Abyss, Blender (Abyss). Nemo: right-click > Send to Abyss."
+cat > "$A/beast-os-ha-token.desktop" <<D
+[Desktop Entry]
+Type=Application
+Name=Beast OS: connect Home Assistant
+Exec=$R/bin/beast-os-set-ha-token
+Icon=beast-os
+Categories=Settings;
+D
