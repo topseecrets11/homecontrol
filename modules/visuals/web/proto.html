@@ -66,13 +66,19 @@
     .tag { font-size: 10px; letter-spacing: .12em; }
   }
   @media (max-height: 440px) { .lbl { display: none; } #reply { font-size: 12px; } }
+  /* ?view=mood : the glowing mood blob on its own, big and centred, no map behind it. */
+  body.moodonly #brain, body.moodonly #b-mood, body.moodonly #info, body.moodonly .sep { display: none !important; }
+  body.moodonly #mid { flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
+  body.moodonly #blobwrap { width: clamp(160px, min(58vh, 70vw), 560px); }
+  body.moodonly #reply { flex: none; align-self: center; max-width: min(640px, 92vw); font-size: 15px; }
+  body.moodonly #moodgrp { display: flex !important; flex: 1 1 100%; justify-content: center; }
 </style>
 </head>
 <body>
 <canvas id="brain"></canvas>
 <div id="ui">
   <div id="top">
-    <div class="tag"><b>BEAST OS</b> · SECOND BRAIN · sample graph, not wired yet</div>
+    <div class="tag"><b>BEAST OS</b> · <span id="tagname">SECOND BRAIN · sample graph, not wired yet</span></div>
     <div id="state">idle</div>
   </div>
   <div id="mid">
@@ -806,6 +812,13 @@ function beastVisuals(REAL) {
   }
   if (!drawBrain) { LITE = true; drawBrain = BrainLite(brainCanvas); }
   if (!drawBlob) drawBlob = BlobLite(blobCanvas);
+  var MOODONLY = /[?&]view=mood\b/.test(location.search);
+  if (MOODONLY) {
+    document.body.classList.add('moodonly');
+    $('tagname').textContent = 'MOOD';
+    drawBrain = function () {};          // no map behind the blob: nothing to draw, nothing to pay for
+    resize();
+  }
   if (LITE) $('state').textContent = 'idle · lite';
 
   // orbit / zoom / pick
