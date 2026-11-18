@@ -68,7 +68,9 @@ def cmd_init(a):
 def cmd_pair(a):
     code = Auth(store()).new_code(a.role, a.name)
     print(f"\n   Pairing code:  {code[:3]} {code[3:]}     role: {a.role}   (valid 5 minutes)\n")
+    port = kernel.load_config().get("port", 8080) if a.port is None else a.port
     print("   On the device, open Beast OS and type it in.")
+    print(f"   On this machine you can open:  http://127.0.0.1:{port}/pair#code={code}" + (f"&name={a.name}" if a.name else ""))
 
 
 def cmd_devices(a):
@@ -89,7 +91,7 @@ def cmd_serve(a):
 p = argparse.ArgumentParser(prog="beast-os")
 sp = p.add_subparsers(dest="cmd", required=True)
 s = sp.add_parser("serve"); s.add_argument("--port", type=int); s.add_argument("--host", default="0.0.0.0"); s.set_defaults(fn=cmd_serve)
-s = sp.add_parser("pair"); s.add_argument("--role", default="owner", choices=["owner", "tablet", "guest"]); s.add_argument("--name"); s.set_defaults(fn=cmd_pair)
+s = sp.add_parser("pair"); s.add_argument("--role", default="owner", choices=["owner", "tablet", "guest"]); s.add_argument("--name"); s.add_argument("--port", type=int); s.set_defaults(fn=cmd_pair)
 s = sp.add_parser("devices"); s.set_defaults(fn=cmd_devices)
 s = sp.add_parser("revoke"); s.add_argument("name"); s.set_defaults(fn=cmd_revoke)
 s = sp.add_parser("init"); s.add_argument("--from-hub", default="~/beast-hub/config.json"); s.set_defaults(fn=cmd_init)

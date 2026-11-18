@@ -391,7 +391,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.fail(502, "module is not running")
 
 
-PAIR_PAGE = b"""<!doctype html><html lang="en"><head><meta charset="utf-8">
+PAIR_PAGE = rb"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>Beast OS: pair</title>
 <style>
 :root{--bg:#050607;--ink:#d8e6d8;--dim:#6f7d72;--acc:#32cd32}
@@ -407,11 +407,16 @@ input#code{font-size:28px;letter-spacing:.4em;text-align:center}button{cursor:po
 <input id="name" placeholder="Name this device (e.g. Tablet)" maxlength="60">
 <button>PAIR</button><div id="msg"></div></form>
 <script>
-document.getElementById('f').onsubmit=function(e){e.preventDefault();
+var F=document.getElementById('f');
+F.onsubmit=function(e){e.preventDefault();
 fetch('/api/pair',{method:'POST',headers:{'Content-Type':'application/json'},
 body:JSON.stringify({code:document.getElementById('code').value,name:document.getElementById('name').value})})
 .then(function(r){return r.json()}).then(function(j){if(j.ok){location.href='/'}else{document.getElementById('msg').textContent=j.error}})
 .catch(function(){document.getElementById('msg').textContent='Beast did not answer'})};
+var m=/code=(\d{6})/.exec(location.hash);if(m){history.replaceState(null,'','/pair');
+document.getElementById('code').value=m[1];document.getElementById('name').value=(/name=([^&]+)/.exec(location.hash)||[])[1]||'';
+if(document.getElementById('name').value){document.getElementById('name').value=decodeURIComponent(document.getElementById('name').value)}
+F.requestSubmit?F.requestSubmit():F.onsubmit(new Event('submit'))}
 </script></body></html>"""
 
 

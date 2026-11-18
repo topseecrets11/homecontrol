@@ -1,7 +1,7 @@
 // Beast OS service worker: network-first, offline fallback for the shell only.
 // Never caches /api/*, /abyss/* or anything that isn't a plain same-origin GET.
-var CACHE_NAME = 'beast-os-v2';
-var SHELL = ['/', '/homeos.css', '/homeos.js', '/icon.svg', '/manifest.json'];
+var CACHE_NAME = 'beast-os-v3';
+var SHELL = ['/', '/homeos.css', '/beastos.js', '/homeos.js', '/icon.svg', '/manifest.json'];
 
 self.addEventListener('install', function(event) {
   event.waitUntil(caches.open(CACHE_NAME).then(function(c) { return c.addAll(SHELL); }));

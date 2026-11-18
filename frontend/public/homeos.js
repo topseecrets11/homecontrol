@@ -15,6 +15,11 @@
     ORACLE:  { title: 'THE ORACLE',  subtitle: 'Forecasting, Trajectories' }
   };
 
+  // Plug-in modules registered by Beast OS (see beastos.js). The original four stay as built.
+  var PLUGINS = {};
+  var _activePlugin = null;
+  var _pendingModule = null;
+
   var VIRGIL_MESSAGES = {
     ARENA: {
       normal:   'Sales Machine online. Monitoring conversion metrics.',
@@ -36,23 +41,6 @@
     }
   };
 
-  var FUNNEL_EVENT_POOL = [
-    { type: 'FRONT-END SALE', detail: 'NICHE_B_TEMPLATE', amount: '$47.00' },
-    { type: 'LEAD CAPTURED', detail: 'GOOGLE_ADS \u2014 niche_a_funnel', amount: null },
-    { type: 'CART ABANDON', detail: 'STRIPE_CHECKOUT', amount: '$197.00' },
-    { type: 'UPSELL ACCEPTED', detail: 'NICHE_C_BUNDLE', amount: '$97.00' },
-    { type: 'LEAD CAPTURED', detail: 'ORGANIC \u2014 blog_seo_post', amount: null },
-    { type: 'FRONT-END SALE', detail: 'NICHE_A_COURSE', amount: '$27.00' },
-    { type: 'SUBSCRIPTION RENEWED', detail: 'NICHE_B_SAAS', amount: '$29.00/mo' },
-    { type: 'HIGH-TIER SALE', detail: 'NICHE_A_MENTORSHIP', amount: '$497.00' },
-    { type: 'TRIAL SIGNUP', detail: 'NICHE_A_PLATFORM \u2014 free_tier', amount: null },
-    { type: 'REFUND PROCESSED', detail: 'STRIPE', amount: '-$47.00' },
-    { type: 'LEAD CAPTURED', detail: 'TWITTER_ADS \u2014 niche_b_webinar', amount: null },
-    { type: 'FRONT-END SALE', detail: 'NICHE_C_EBOOK', amount: '$19.00' },
-    { type: 'UPSELL DECLINED', detail: 'NICHE_B_PREMIUM', amount: '$197.00' },
-    { type: 'CART ABANDON', detail: 'PAYPAL', amount: '$97.00' },
-    { type: 'LEAD CAPTURED', detail: 'REFERRAL \u2014 partner_link', amount: null }
-  ];
 
   var DEFAULT_STATE = {
     activeModule: 'ARENA',
@@ -60,32 +48,29 @@
     wellbeing: { lastCheckIn: null, recovery: 5, vitality: 5, temper: 5 },
     lastActivity: Date.now(),
     activeTheme: '#32CD32',
+    dataVersion: 2,
+    // Real numbers only. The Arena is fed by the Ledger, the Node by the house.
     arena: {
-      leadVelocity: 42,
-      conversionEfficiency: 2.4,
-      customerLTV: 34.50,
-      monthlyNetProfit: 4200,
+      leadVelocity: 0,
+      conversionEfficiency: 0,
+      customerLTV: 0,
+      monthlyNetProfit: 0,
       targetMonthly: 15000,
-      growthData: [1200, 1800, 2400, 3100, 3800, 4200, 5400, 6800, 8200, 10100, 11800, 13500]
+      growthData: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     },
-    products: [
-      { id: 'P1', name: 'Prompt Pack v2', price: 29.00, sales: 142, revenue: 4118 },
-      { id: 'P2', name: 'Niche Starter Guide', price: 49.00, sales: 85, revenue: 4165 }
-    ],
-    transactions: [
-      { tx: 'tx_98A2', time: '14:02', product: 'Prompt Pack v2', amount: 29.00, status: 'paid', source: 'Meta Ads', customer: 'usr_881' },
-      { tx: 'tx_98A3', time: '14:15', product: 'Niche Starter Guide', amount: 49.00, status: 'paid', source: 'Organic Email', customer: 'usr_224' },
-      { tx: 'tx_98A4', time: '14:45', product: 'Prompt Pack v2', amount: 29.00, status: 'abandoned', source: 'Meta Ads', customer: 'usr_993' }
-    ],
+    products: [],
+    transactions: [],
+    funnel: [],
     environment: {
-      climate: { location: 'Strathdale, VIC', tempOut: 22, tempIn: 24, humidity: 45 },
+      climate: { location: 'Strathdale, VIC', tempOut: null, tempIn: null, humidity: null },
+      network: { status: 'CHECKING', latencyMs: null },
       devices: [
-        { id: 'g1', name: 'Genio Main Light', type: 'light', state: 'on' },
-        { id: 'g2', name: 'Genio Desk Light', type: 'light', state: 'off' },
-        { id: 'g3', name: 'Genio Powerboard (Bench)', type: 'power', state: 'on' }
+        { id: 'g1', name: 'Genio Main Light', type: 'light', state: 'unknown', entity: '' },
+        { id: 'g2', name: 'Genio Desk Light', type: 'light', state: 'unknown', entity: '' },
+        { id: 'g3', name: 'Genio Powerboard (Bench)', type: 'power', state: 'unknown', entity: '' }
       ],
       sentry: [
-        { id: 'cam1', name: 'UNIDEN SOLO PRO - FRONT', status: 'standby', battery: '84%', lastEvent: '14:02 - Motion Detected' }
+        { id: 'cam1', name: 'UNIDEN SOLO PRO - FRONT', status: 'offline', battery: '--', lastEvent: 'Not connected yet' }
       ]
     },
     config: {
@@ -141,8 +126,10 @@
         next[k] = partial[k];
       }
     }
+    next._savedAt = Date.now();
     _cache = next;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    if (window.BeastOS && window.BeastOS.onState) window.BeastOS.onState(next);
     return next;
   }
 
@@ -167,11 +154,24 @@
       if (!state.lastActivity) { state.lastActivity = Date.now(); changed = true; }
       if (!isHexColor(state.activeTheme)) { state.activeTheme = '#32CD32'; changed = true; }
       if (state.config && 'stripeKey' in state.config) { delete state.config.stripeKey; changed = true; }
+      if ((state.dataVersion || 1) < 2) {
+        state.arena = deepCopy(DEFAULT_STATE.arena);
+        state.products = [];
+        state.transactions = [];
+        state.funnel = [];
+        state.environment = deepCopy(DEFAULT_STATE.environment);
+        state.dataVersion = 2;
+        changed = true;
+      }
       if (changed) {
         _cache = state;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       }
     }
+  }
+
+  function fmtReading(v, unit) {
+    return (v === null || v === undefined || v === '') ? '--' : String(v) + unit;
   }
 
   function isHexColor(v) {
@@ -332,6 +332,10 @@
       msgEl.textContent = msgs.readonly || msgs.normal;
     } else if (state.resilience.t1 && mod < 0.4) {
       msgEl.textContent = msgs.nudge || msgs.normal;
+    } else if (moduleName === 'ARENA' && state.arena && state.arena.monthlyNetProfit === 0) {
+      msgEl.textContent = 'Ledger reads $0 this month. The Arena only pays out when you ship. Go build.';
+    } else if (PLUGINS[moduleName] && PLUGINS[moduleName].virgil) {
+      msgEl.textContent = PLUGINS[moduleName].virgil;
     } else {
       msgEl.textContent = msgs.normal;
     }
@@ -447,6 +451,14 @@
     cleanupArena();
     cleanupNode();
     cleanupSanctum();
+    if (_activePlugin && _activePlugin.unmount) { try { _activePlugin.unmount(); } catch (e) {} }
+    _activePlugin = null;
+
+    if (!MODULE_INFO[moduleName] && !PLUGINS[moduleName]) {
+      // a plug-in that hasn't registered yet: open it when it does
+      _pendingModule = moduleName;
+      moduleName = 'ARENA';
+    }
 
     // Remove any lockout overlay
     removeById('arena-lockout-overlay');
@@ -475,6 +487,9 @@
       viewport.appendChild(mountSanctumModule());
     } else if (moduleName === 'ORACLE') {
       viewport.appendChild(mountOracleModule());
+    } else if (PLUGINS[moduleName]) {
+      _activePlugin = PLUGINS[moduleName];
+      viewport.appendChild(_activePlugin.mount());
     }
 
     // Update state & UI
@@ -509,27 +524,27 @@
         h('div', { className: 'climate-row' },
           h('div', { className: 'climate-metric' },
             h('span', { className: 'climate-label' }, 'OUTSIDE'),
-            h('span', { className: 'climate-val', 'data-testid': 'climate-temp-out' }, climate.tempOut + '\u00B0C')
+            h('span', { className: 'climate-val', 'data-testid': 'climate-temp-out' }, fmtReading(climate.tempOut, '\u00B0C'))
           ),
           h('div', { className: 'climate-metric' },
             h('span', { className: 'climate-label' }, 'INSIDE'),
-            h('span', { className: 'climate-val climate-val-accent', 'data-testid': 'climate-temp-in' }, climate.tempIn + '\u00B0C')
+            h('span', { className: 'climate-val climate-val-accent', 'data-testid': 'climate-temp-in' }, fmtReading(climate.tempIn, '\u00B0C'))
           )
         ),
         h('div', { className: 'climate-metric climate-metric-full' },
           h('span', { className: 'climate-label' }, 'HUMIDITY'),
-          h('span', { className: 'climate-val', 'data-testid': 'climate-humidity' }, climate.humidity + '%')
+          h('span', { className: 'climate-val', 'data-testid': 'climate-humidity' }, fmtReading(climate.humidity, '%'))
         )
       ),
       h('div', { className: 'node-section-title node-section-gap' }, 'NETWORK'),
       h('div', { className: 'climate-card' },
         h('div', { className: 'climate-metric climate-metric-full' },
           h('span', { className: 'climate-label' }, 'STATUS'),
-          h('span', { className: 'climate-val climate-val-accent', 'data-testid': 'network-status' }, 'ONLINE')
+          h('span', { className: 'climate-val climate-val-accent', 'data-testid': 'network-status' }, (env.network && env.network.status) || 'CHECKING')
         ),
         h('div', { className: 'climate-metric climate-metric-full' },
           h('span', { className: 'climate-label' }, 'LATENCY'),
-          h('span', { className: 'climate-val', 'data-testid': 'network-latency' }, '12ms')
+          h('span', { className: 'climate-val', 'data-testid': 'network-latency' }, fmtReading(env.network && env.network.latencyMs, 'ms'))
         )
       )
     );
@@ -558,6 +573,7 @@
             var s = getState();
             var envCopy = deepCopy(s.environment);
             var d = envCopy.devices[idx];
+            if (window.BeastOS && window.BeastOS.deviceToggle && d.entity) window.BeastOS.deviceToggle(d);
             d.state = d.state === 'on' ? 'off' : 'on';
             setState({ environment: envCopy });
 
@@ -1126,9 +1142,13 @@
 
     // Funnel Pulse
     var funnelFeed = h('div', { className: 'funnel-feed', 'data-testid': 'funnel-feed' });
-    for (var i = 0; i < 5; i++) {
-      funnelFeed.appendChild(createFunnelEvent());
+    function fillFunnel() {
+      while (funnelFeed.firstChild) funnelFeed.removeChild(funnelFeed.firstChild);
+      var evts = (getState().funnel || []).slice(0, 10);
+      if (!evts.length) evts = [{ type: 'NO ACTIVITY', detail: 'Ledger is empty. Log your first sale.', amount: null, ts: null }];
+      for (var i = 0; i < evts.length; i++) funnelFeed.appendChild(createFunnelEvent(evts[i]));
     }
+    fillFunnel();
 
     var funnelPulse = h('div', { className: 'funnel-pulse', 'data-testid': 'funnel-pulse' },
       h('div', { className: 'funnel-header' },
@@ -1138,17 +1158,7 @@
       funnelFeed
     );
 
-    _funnelInterval = setInterval(function() {
-      var newEvent = createFunnelEvent();
-      if (funnelFeed.firstChild) {
-        funnelFeed.insertBefore(newEvent, funnelFeed.firstChild);
-      } else {
-        funnelFeed.appendChild(newEvent);
-      }
-      while (funnelFeed.children.length > 10) {
-        funnelFeed.removeChild(funnelFeed.lastChild);
-      }
-    }, 6000);
+    _funnelInterval = setInterval(fillFunnel, 6000);
 
     return h('div', { className: 'arena-overview', 'data-testid': 'arena-overview' }, kpiGrid, funnelPulse);
   }
@@ -1450,13 +1460,11 @@
   // ============================================
   // Funnel Pulse \u2014 Live Terminal Feed
   // ============================================
-  function createFunnelEvent() {
-    var pool = FUNNEL_EVENT_POOL;
-    var evt = pool[Math.floor(Math.random() * pool.length)];
-    var now = new Date();
-    var hh = now.getHours();
-    var mm = now.getMinutes();
-    var ts = '[' + (hh < 10 ? '0' : '') + hh + ':' + (mm < 10 ? '0' : '') + mm + ']';
+  function createFunnelEvent(evt) {
+    var when = evt.ts ? new Date(evt.ts) : null;
+    var hh = when ? when.getHours() : null;
+    var mm = when ? when.getMinutes() : null;
+    var ts = when ? '[' + (hh < 10 ? '0' : '') + hh + ':' + (mm < 10 ? '0' : '') + mm + ']' : '[--:--]';
 
     var line = h('div', { className: 'funnel-event' },
       h('span', { className: 'funnel-ts', textContent: ts }),
@@ -1907,9 +1915,51 @@
     registerSW();
   }
 
+  // ============================================
+  // BEAST OS HOOKS: plug-in modules + live data
+  // ============================================
+  function registerPlugin(id, def) {
+    if (PLUGINS[id] || MODULE_INFO[id]) return;
+    PLUGINS[id] = def;
+    var nav = document.getElementById('nav-modules');
+    if (nav) {
+      var btn = h('button', { className: 'nav-btn', 'data-module': id, 'data-testid': 'nav-' + id.toLowerCase() },
+        h('span', { className: 'nav-dot' }),
+        h('div', { className: 'nav-text' },
+          h('span', { className: 'nav-title', textContent: def.title }),
+          h('span', { className: 'nav-sub' })
+        )
+      );
+      btn.addEventListener('click', function() { navigateTo(id); });
+      nav.appendChild(btn);
+    }
+    if (_pendingModule === id) { _pendingModule = null; navigateTo(id); }
+    else updateNavButtons((getState() || {}).activeModule);
+  }
+
+  window.HomeOS = {
+    register: registerPlugin,
+    navigate: function(m) { navigateTo(m); },
+    getState: function() { return getState(); },
+    setState: function(p) { return setState(p); },
+    h: h,
+    // re-draw the current screen after live data lands (only the data-driven ones)
+    refresh: function() {
+      var st = getState();
+      var m = st && st.activeModule;
+      if (m === 'NODE' || (m === 'ARENA' && !document.querySelector('.kpi-card.is-expanded'))) navigateTo(m);
+      updateVirgil(m);
+    }
+  };
+
+  function boot() {
+    if (window.BeastOS && window.BeastOS.pull) window.BeastOS.pull(init);
+    else init();
+  }
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('DOMContentLoaded', boot);
   } else {
-    init();
+    boot();
   }
 })();
