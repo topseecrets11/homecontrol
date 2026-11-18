@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Phone</title>
+<style>
+:root{--bg:#0a0a0a;--card:#141414;--line:#2a2a2a;--ink:#d8e6d8;--dim:#7a857c;--acc:#32cd32;--bad:#ff6b6b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:'JetBrains Mono','DejaVu Sans Mono',monospace;padding:16px}
+h1{font-size:13px;letter-spacing:.3em;color:var(--acc);margin:0 0 12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+.name{font-size:14px;color:var(--acc)}.bat{font-size:12px;color:var(--dim);margin-top:2px}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+button,input,textarea{font:inherit;font-size:12px;color:var(--ink);background:#101010;border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+button{cursor:pointer}button:hover{border-color:var(--acc);color:var(--acc)}input,textarea{flex:1 1 200px}
+#msg{min-height:1.4em;font-size:12px;color:var(--acc)}.err{color:var(--bad)!important}pre{white-space:pre-wrap;font-size:11px;color:var(--dim)}
+</style></head><body>
+<h1>PHONE · KDE CONNECT</h1><div id="msg"></div><div id="list"></div>
+<script>
+(function(){
+  var list=document.getElementById('list'), msg=document.getElementById('msg');
+  function say(t,bad){msg.textContent=t;msg.className=bad?'err':'';}
+  function el(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e}
+  function act(dev,body){body.device=dev;return fetch('/api/kdeconnect/action',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(j){if(!j.ok)throw new Error(j.error);return j})}
+  function btn(t,f){var b=el('button',null,t);b.onclick=f;return b}
+  fetch('/api/kdeconnect/devices',{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(j){
+    if(!j.ok){say(j.error,true);return}
+    if(!j.devices.length){say('No phone paired yet. Open KDE Connect on the phone and on Beast, and pair them.');return}
+    j.devices.forEach(function(d){
+      var c=el('div','card');c.appendChild(el('div','name',d.name));
+      c.appendChild(el('div','bat',d.battery==null?'battery: --':'battery: '+d.battery+'%'+(d.charging?' (charging)':'')));
+      var r1=el('div','row');
+      r1.appendChild(btn('Ping',function(){act(d.id,{action:'ping'}).then(function(){say('Pinged')}).catch(function(e){say(e.message,true)})}));
+      r1.appendChild(btn('Ring (find phone)',function(){act(d.id,{action:'ring'}).then(function(){say('Ringing')}).catch(function(e){say(e.message,true)})}));
+      r1.appendChild(btn('Take photo → Abyss',function(){say('Waiting for the phone…');act(d.id,{action:'photo'}).then(function(j){say('Saved to '+j.saved)}).catch(function(e){say(e.message,true)})}));
+      r1.appendChild(btn('Notifications',function(){act(d.id,{action:'notifications'}).then(function(j){out.textContent=j.notifications.join('\n')||'none'}).catch(function(e){say(e.message,true)})}));
+      c.appendChild(r1);
+      var r2=el('div','row');var t=el('input');t.placeholder='Text or link to send to the phone';
+      r2.appendChild(t);r2.appendChild(btn('Send',function(){var v=t.value.trim();if(!v)return;act(d.id,/^https?:\/\//.test(v)?{action:'url',url:v}:{action:'text',text:v}).then(function(){say('Sent');t.value=''}).catch(function(e){say(e.message,true)})}));
+      c.appendChild(r2);
+      var r3=el('div','row');var n=el('input');n.placeholder='SMS to (+61…)';n.style.flex='0 1 150px';var m=el('input');m.placeholder='Message';
+      r3.appendChild(n);r3.appendChild(m);r3.appendChild(btn('Send SMS',function(){act(d.id,{action:'sms',to:n.value,text:m.value}).then(function(){say('SMS sent');m.value=''}).catch(function(e){say(e.message,true)})}));
+      c.appendChild(r3);var out=el('pre');c.appendChild(out);list.appendChild(c);
+    });
+  });
+})();
+</script></body></html>

@@ -1,0 +1,7 @@
+{
+  "id": "kdeconnect",
+  "title": "KDE Connect",
+  "tab": {"label": "PHONE", "icon": "☏", "order": 25, "view": "frame", "src": "/m/kdeconnect/"},
+  "role": "owner",
+  "web": "web"
+}
