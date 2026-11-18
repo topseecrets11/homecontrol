@@ -15,11 +15,10 @@
   'use strict';
   if (window.BeastBlob) return;
 
-  // The goo character lives in the corner of Beast OS on every screen. To hide him on one device:
-  // open the shell once with ?blob=off (remembered), ?blob=on to bring him back.
+  // The goo character is retired (off everywhere). To bring him back on one device, open the shell once with ?blob=on.
   var pref = (/[?&]blob=(on|off)/.exec(location.search) || [])[1];
   try { if (pref) localStorage.setItem('beastBlob', pref); else pref = localStorage.getItem('beastBlob'); } catch (e) {}
-  var wanted = pref ? pref === 'on' : true;          // on everywhere: desktop and tablet
+  var wanted = pref === 'on';                        // retired: off on every device. ?blob=on brings him back
   if (!wanted) {
     var nop = function () {};
     window.BeastBlob = { react: nop, setMood: nop, setLevel: nop, schedule: nop, get state() { return { state: 'off' }; } };
