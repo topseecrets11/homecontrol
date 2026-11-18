@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Add the tablet's Termux key to Beast, locked to the LAN, forwarding only to Beast OS.
+# usage: beast-os-add-tablet-key "ssh-ed25519 AAAA... tablet@beast-os"
+set -euo pipefail
+KEY="${1:?paste the tablet's public key in quotes}"
+[[ "$KEY" =~ ^ssh-ed25519\ [A-Za-z0-9+/=]+(\ .*)?$ ]] || { echo "that doesn't look like an ed25519 public key"; exit 1; }
+mkdir -p ~/.ssh && chmod 700 ~/.ssh
+LINE="from=\"192.168.1.0/24\",no-agent-forwarding,no-X11-forwarding,permitopen=\"127.0.0.1:8090\",permitopen=\"127.0.0.1:8080\" $KEY"
+grep -qF "$KEY" ~/.ssh/authorized_keys 2>/dev/null && { echo "already there"; exit 0; }
+echo "$LINE" >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys
+echo "tablet key added (LAN only, tunnel to Beast OS only)"

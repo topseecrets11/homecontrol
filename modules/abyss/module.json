@@ -1,0 +1,7 @@
+{
+  "id": "abyss",
+  "title": "Abyss",
+  "tab": {"label": "ABYSS", "icon": "◆", "order": 15, "view": "frame", "src": "/m/abyss/"},
+  "role": "tablet",
+  "web": "web"
+}

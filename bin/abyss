@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# abyss: desktop helper for the Abyss vault.
+#   abyss open                     open the Abyss app (pattern screen)
+#   abyss run blender [Folder/sub] Blender with no network, saving into Abyss
+#   abyss send FILE...             move files into Abyss (encrypted), by type
+set -euo pipefail
+URL=http://127.0.0.1:8090
+PROFILE="$HOME/.config/beast-os-chrome"
+SOCK="$HOME/.config/beast-os/abyss.sock"
+
+call() {  # JSON request to abyss-agent
+  python3 -I - "$SOCK" "$1" <<'PY'
+import json, socket, sys
+s = socket.socket(socket.AF_UNIX); s.connect(sys.argv[1]); s.sendall(sys.argv[2].encode() + b"\n")
+d = b""
+while not d.endswith(b"\n"):
+    c = s.recv(65536)
+    if not c: break
+    d += c
+r = json.loads(d); print(json.dumps(r)); sys.exit(0 if r.get("ok") else 1)
+PY
+}
+locked() {
+  notify-send -i security-high "Abyss is locked" "Draw your pattern to open it." 2>/dev/null || true
+  exec "$0" open
+}
+mounted() { mountpoint -q "$HOME/$1/Abyss"; }
+
+case "${1:-open}" in
+  open)
+    exec google-chrome --app="$URL/m/abyss/" --user-data-dir="$PROFILE" --window-size=1100,760 ;;
+  run)
+    app="${2:-blender}"; sub="${3:-Videos/Blender}"
+    mounted "${sub%%/*}" || locked
+    call "{\"op\":\"run\",\"app\":\"$app\",\"sub\":\"$sub\",\"net\":\"none\"}" >/dev/null ;;
+  send)
+    shift; n=0
+    for f in "$@"; do
+      [ -f "$f" ] || continue
+      case "$(file -b --mime-type "$f")" in
+        image/*) dest=Pictures ;; video/*) dest=Videos ;; audio/*) dest=Music ;; *) dest=Documents ;;
+      esac
+      mounted "$dest" || locked
+      mkdir -p "$HOME/$dest/Abyss/Inbox"
+      mv -n -- "$f" "$HOME/$dest/Abyss/Inbox/" && n=$((n+1))
+    done
+    notify-send -i security-high "Abyss" "$n file(s) moved in and encrypted." 2>/dev/null || true ;;
+  *) echo "usage: abyss open | run blender [Folder/sub] | send FILE..."; exit 1 ;;
+esac

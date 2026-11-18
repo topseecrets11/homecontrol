@@ -103,6 +103,12 @@ class Raw:
         self.data, self.ctype, self.cache = data, ctype, cache
 
 
+class File:
+    """Return from a route to stream a file from disk (supports Range, for video)."""
+    def __init__(self, path, ctype, cache="no-store"):
+        self.path, self.ctype, self.cache = path, ctype, cache
+
+
 class Kernel:
     def __init__(self):
         os.makedirs(HOME, mode=0o700, exist_ok=True)
@@ -199,6 +205,47 @@ class Handler(BaseHTTPRequestHandler):
         if self.command != "HEAD":
             self.wfile.write(data)
 
+    def send_file(self, f):
+        size = os.path.getsize(f.path)
+        start, end, code = 0, size - 1, 200
+        rng = self.headers.get("Range", "")
+        if rng.startswith("bytes=") and size:
+            a, _, b = rng[6:].split(",")[0].partition("-")
+            try:
+                if a:
+                    start = int(a)
+                    end = min(int(b), size - 1) if b else size - 1
+                else:
+                    start = max(0, size - int(b))
+                if start > end:
+                    raise ValueError
+                code = 206
+            except ValueError:
+                self.send_response(416)
+                self.send_header("Content-Range", f"bytes */{size}")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+        self.send_response(code)
+        self.send_header("Content-Type", f.ctype)
+        self.send_header("Accept-Ranges", "bytes")
+        self.send_header("Content-Length", str(end - start + 1 if size else 0))
+        if code == 206:
+            self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+        self._common_headers(f.cache)
+        self.end_headers()
+        if self.command == "HEAD" or not size:
+            return
+        with open(f.path, "rb") as fh:
+            fh.seek(start)
+            left = end - start + 1
+            while left > 0:
+                chunk = fh.read(min(1 << 20, left))
+                if not chunk:
+                    break
+                self.wfile.write(chunk)
+                left -= len(chunk)
+
     def redirect(self, to):
         self.send_response(302)
         self.send_header("Location", to)
@@ -269,13 +316,16 @@ class Handler(BaseHTTPRequestHandler):
                 if not k.auth.allows(who, role):
                     return self.fail(403, "not allowed for this device")
                 req = Request(self, path, query, who, params)
-                if opts["max_body"] != MAX_JSON:
-                    req.body(opts["max_body"])
+                if int(self.headers.get("Content-Length") or 0) > opts["max_body"]:
+                    raise HttpError(413, "body too large")
+                req.max_body = opts["max_body"]
                 out = fn(req)
                 if opts["stream"]:
                     return
                 if isinstance(out, Raw):
                     return self.send_bytes(out.data, out.ctype, out.cache)
+                if isinstance(out, File):
+                    return self.send_file(out)
                 return self.send_json({"ok": True, **(out or {})})
 
             # module static / proxy:  /m/<id>/...

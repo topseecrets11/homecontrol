@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Abyss</title>
+<style>
+  :root { --bg:#050607; --panel:#0e1110; --card:#141716; --line:#26302a; --ink:#d8e6d8; --dim:#6f7d72; --acc:#32cd32; --void:#7b5cff; --bad:#ff6b6b; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--ink); font-family:'JetBrains Mono','DejaVu Sans Mono',monospace; }
+  body { background: radial-gradient(ellipse at 50% 30%, #120d24 0%, var(--bg) 65%); }
+  button, input, select { font:inherit; font-size:12px; color:var(--ink); background:#0b0e0d; border:1px solid var(--line); border-radius:8px; padding:7px 10px; }
+  button { cursor:pointer; } button:hover { border-color:var(--acc); color:var(--acc); }
+  .hidden { display:none !important; }
+  /* lock screen */
+  #lock { min-height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:20px; text-align:center; }
+  #lock h1 { margin:0; font-size:16px; letter-spacing:.5em; color:var(--void); text-shadow:0 0 18px rgba(123,92,255,.6); }
+  #lock p { margin:0; color:var(--dim); font-size:12px; max-width:360px; line-height:1.5; }
+  #grid { width:min(320px, 80vw); aspect-ratio:1; touch-action:none; border-radius:16px; background:rgba(123,92,255,.04); border:1px solid rgba(123,92,255,.18); }
+  #msg { min-height:1.4em; font-size:12px; color:var(--bad); }
+  .row { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
+  #phrase { width:min(320px, 80vw); }
+  /* browser */
+  #vault { display:flex; flex-direction:column; height:100%; }
+  #bar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:10px 12px; border-bottom:1px solid var(--line); background:rgba(14,17,16,.8); }
+  #crumbs { flex:1 1 200px; font-size:12px; color:var(--dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #crumbs a { color:var(--ink); cursor:pointer; } #crumbs a:hover { color:var(--acc); }
+  #timer { font-size:11px; color:var(--void); letter-spacing:.1em; }
+  #filters { display:flex; gap:6px; flex-wrap:wrap; padding:8px 12px; }
+  #filters button.on { border-color:var(--void); color:#c7b8ff; }
+  #items { flex:1; overflow:auto; padding:8px 12px 16px; display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:10px; align-content:start; }
+  .it { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px; cursor:pointer; min-width:0; }
+  .it:hover { border-color:var(--void); }
+  .it .ic { font-size:26px; height:84px; display:flex; align-items:center; justify-content:center; border-radius:8px; background:#0a0c0b; overflow:hidden; }
+  .it .ic img { width:100%; height:100%; object-fit:cover; }
+  .it .nm { font-size:11px; margin-top:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .it .mt { font-size:10px; color:var(--dim); }
+  #empty { color:var(--dim); font-size:12px; padding:20px; }
+  /* viewer */
+  #viewer { position:fixed; inset:0; background:rgba(0,0,0,.92); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:16px; }
+  #viewer .body { max-width:100%; max-height:calc(100% - 60px); display:flex; }
+  #viewer img, #viewer video { max-width:100%; max-height:calc(100vh - 100px); border-radius:8px; }
+  #viewer .cap { font-size:12px; color:var(--dim); }
+  #drop { position:fixed; inset:0; border:3px dashed var(--void); background:rgba(123,92,255,.08); display:flex; align-items:center; justify-content:center; font-size:14px; letter-spacing:.3em; pointer-events:none; }
+</style>
+</head>
+<body>
+
+<section id="lock" class="hidden">
+  <h1>ABYSS</h1>
+  <p id="lockhint">Draw your pattern.</p>
+  <canvas id="grid"></canvas>
+  <div id="msg"></div>
+  <div class="row">
+    <button id="b-clear">Clear</button>
+    <button id="b-phrase">Use phrase</button>
+    <button id="b-card">Use key card</button>
+  </div>
+  <div class="row hidden" id="phrasebox">
+    <input id="phrase" type="password" placeholder="Backup phrase (12+ characters)" autocomplete="off">
+    <button id="b-phrase-go">Unlock</button>
+  </div>
+</section>
+
+<section id="vault" class="hidden">
+  <div id="bar">
+    <div id="crumbs"></div>
+    <input id="q" placeholder="Search here…" style="flex:0 1 160px">
+    <select id="sort"><option value="name">Name</option><option value="new">Newest</option><option value="big">Biggest</option></select>
+    <button id="b-up">⇪ Add</button>
+    <button id="b-dir">+ Folder</button>
+    <button id="b-blender" title="Blender with no network, saving into this Abyss folder">◈ Blender</button>
+    <span id="timer"></span>
+    <button id="b-lock">Lock</button>
+  </div>
+  <div id="filters"></div>
+  <div id="items"></div>
+  <input id="file" type="file" multiple class="hidden">
+</section>
+
+<div id="viewer" class="hidden"><div class="body" id="vbody"></div><div class="cap" id="vcap"></div><div class="row"><button id="b-vclose">Close</button></div></div>
+<div id="drop" class="hidden">DROP INTO THE ABYSS</div>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var path = '', entries = [], filter = 'all', mode = 'unlock', firstPattern = null, setupPhrase = '';
+  var sessionEnds = 0;
+
+  function api(url, opts) {
+    opts = opts || {}; opts.credentials = 'same-origin';
+    if (opts.json) { opts.method = opts.method || 'POST'; opts.headers = { 'Content-Type': 'application/json' }; opts.body = JSON.stringify(opts.json); }
+    return fetch(url, opts).then(function (r) {
+      if (r.status === 401) { top.location.href = '/pair'; throw new Error('unpaired'); }
+      return r.json().then(function (j) { if (!j.ok) { var e = new Error(j.error || 'failed'); e.status = r.status; throw e; } return j; });
+    });
+  }
+  function msg(t, good) { $('msg').style.color = good ? 'var(--acc)' : 'var(--bad)'; $('msg').textContent = t || ''; }
+  function show(id) { ['lock', 'vault'].forEach(function (s) { $(s).classList.toggle('hidden', s !== id); }); }
+
+  // ---------------- pattern grid (4x4, needs 6+ dots, no repeats) ----------------
+  var cv = $('grid'), ctx = cv.getContext('2d'), dots = [], seq = [], drawing = false, cur = null, flash = 0;
+  function sizeGrid() {
+    var r = cv.getBoundingClientRect(), d = Math.min(window.devicePixelRatio || 1, 2);
+    cv.width = r.width * d; cv.height = r.height * d; ctx.setTransform(d, 0, 0, d, 0, 0);
+    dots = []; var pad = r.width * 0.14, step = (r.width - 2 * pad) / 3;
+    for (var y = 0; y < 4; y++) for (var x = 0; x < 4; x++) dots.push([pad + x * step, pad + y * step]);
+    drawGrid();
+  }
+  function drawGrid() {
+    var w = cv.width, r = cv.getBoundingClientRect();
+    ctx.clearRect(0, 0, r.width, r.height);
+    var col = flash > 0 ? 'rgba(255,107,107,' : 'rgba(123,92,255,';
+    if (seq.length) {
+      ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.strokeStyle = col + '0.85)'; ctx.shadowColor = col + '0.9)'; ctx.shadowBlur = 14;
+      ctx.beginPath();
+      seq.forEach(function (i, k) { var d = dots[i]; k ? ctx.lineTo(d[0], d[1]) : ctx.moveTo(d[0], d[1]); });
+      if (drawing && cur) ctx.lineTo(cur[0], cur[1]);
+      ctx.stroke(); ctx.shadowBlur = 0;
+    }
+    dots.forEach(function (d, i) {
+      var on = seq.indexOf(i) >= 0;
+      ctx.beginPath(); ctx.arc(d[0], d[1], on ? 9 : 5, 0, 6.283);
+      ctx.fillStyle = on ? '#c7b8ff' : 'rgba(216,230,216,.35)'; ctx.fill();
+      if (on) { ctx.beginPath(); ctx.arc(d[0], d[1], 16, 0, 6.283); ctx.strokeStyle = col + '0.5)'; ctx.lineWidth = 1.5; ctx.stroke(); }
+    });
+  }
+  function hit(p) {
+    for (var i = 0; i < dots.length; i++) { var d = dots[i]; if (Math.hypot(d[0] - p[0], d[1] - p[1]) < 22 && seq.indexOf(i) < 0) return i; }
+    return -1;
+  }
+  function pt(e) { var r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+  cv.addEventListener('pointerdown', function (e) { drawing = true; seq = []; flash = 0; msg(''); cv.setPointerCapture(e.pointerId); var i = hit(pt(e)); if (i >= 0) seq.push(i); drawGrid(); });
+  cv.addEventListener('pointermove', function (e) { if (!drawing) return; cur = pt(e); var i = hit(cur); if (i >= 0) seq.push(i); drawGrid(); });
+  cv.addEventListener('pointerup', function () { drawing = false; cur = null; drawGrid(); if (seq.length) patternDone(seq.slice()); });
+  function wrong(t) { flash = 1; drawGrid(); msg(t); setTimeout(function () { seq = []; flash = 0; drawGrid(); }, 900); }
+
+  function patternDone(p) {
+    if (p.length < 6) return wrong('Use at least 6 dots.');
+    if (mode === 'unlock') {
+      api('/api/abyss/unlock', { json: { method: 'pattern', pattern: p } }).then(opened).catch(function (e) { wrong(e.message); });
+    } else if (mode === 'setup1') {
+      firstPattern = p; seq = []; drawGrid(); mode = 'setup2'; $('lockhint').textContent = 'Draw it again to confirm.';
+    } else if (mode === 'setup2') {
+      if (p.join() !== firstPattern.join()) { mode = 'setup1'; firstPattern = null; $('lockhint').textContent = 'Didn\'t match. Draw your new pattern.'; return wrong('Patterns didn\'t match.'); }
+      setupPhrase = prompt('Backup phrase (12+ characters). Write it down somewhere safe. It unlocks Abyss if you forget the pattern.') || '';
+      if (setupPhrase.trim().length < 12) { mode = 'setup1'; return wrong('Backup phrase needs 12+ characters. Start again.'); }
+      msg('Encrypting your folders…', true);
+      api('/api/abyss/setup', { json: { pattern: p, phrase: setupPhrase } }).then(opened).catch(function (e) { mode = 'setup1'; wrong(e.message); });
+    }
+  }
+
+  $('b-clear').onclick = function () { seq = []; msg(''); drawGrid(); };
+  $('b-phrase').onclick = function () { $('phrasebox').classList.toggle('hidden'); $('phrase').focus(); };
+  $('b-phrase-go').onclick = function () {
+    api('/api/abyss/unlock', { json: { method: 'phrase', phrase: $('phrase').value } }).then(opened).catch(function (e) { msg(e.message); });
+    $('phrase').value = '';
+  };
+  $('phrase').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('b-phrase-go').click(); });
+  $('b-card').onclick = function () {
+    api('/api/abyss/unlock', { json: { method: 'card' } }).then(opened).catch(function (e) { msg(e.message); });
+  };
+
+  // ---------------- vault ----------------
+  var ICON = { folder: '▤', image: '◩', video: '▶', audio: '♪', doc: '≣', '3d': '◈', other: '◇' };
+  var CATS = [['all', 'All'], ['folder', 'Folders'], ['image', 'Images'], ['video', 'Video'], ['audio', 'Audio'], ['doc', 'Docs'], ['3d', '3D'], ['other', 'Other']];
+  function opened(j) { sessionEnds = Date.now() + ((j && j.session_left) || 21600) * 1000; msg(''); show('vault'); go(''); }
+  function fmtSize(n) { return n > 1e9 ? (n / 1e9).toFixed(1) + ' GB' : n > 1e6 ? (n / 1e6).toFixed(1) + ' MB' : n > 1e3 ? Math.round(n / 1e3) + ' KB' : n + ' B'; }
+
+  function go(p) {
+    path = p;
+    api('/api/abyss/list?path=' + encodeURIComponent(p)).then(function (j) { entries = j.entries; render(); })
+      .catch(function (e) { if (e.status === 423) return locked(); alert(e.message); });
+  }
+  function render() {
+    var cr = $('crumbs'); cr.textContent = '';
+    var parts = path ? path.split('/') : [];
+    var a = document.createElement('a'); a.textContent = 'ABYSS'; a.onclick = function () { go(''); }; cr.appendChild(a);
+    parts.forEach(function (seg, i) {
+      cr.appendChild(document.createTextNode(' / '));
+      var x = document.createElement('a'); x.textContent = seg; x.onclick = function () { go(parts.slice(0, i + 1).join('/')); }; cr.appendChild(x);
+    });
+    var fl = $('filters'); fl.textContent = '';
+    CATS.forEach(function (c) {
+      var n = c[0] === 'all' ? entries.length : entries.filter(function (e) { return e.category === c[0]; }).length;
+      if (!n && c[0] !== 'all') return;
+      var b = document.createElement('button'); b.textContent = c[1] + ' ' + n; b.className = filter === c[0] ? 'on' : '';
+      b.onclick = function () { filter = c[0]; render(); }; fl.appendChild(b);
+    });
+    var q = $('q').value.toLowerCase(), so = $('sort').value;
+    var list = entries.filter(function (e) { return (filter === 'all' || e.category === filter) && (!q || e.name.toLowerCase().indexOf(q) >= 0); });
+    list.sort(function (a, b) {
+      if (a.dir !== b.dir) return a.dir ? -1 : 1;
+      if (so === 'new') return (b.mtime || 0) - (a.mtime || 0);
+      if (so === 'big') return (b.size || 0) - (a.size || 0);
+      return a.name.localeCompare(b.name);
+    });
+    var box = $('items'); box.textContent = '';
+    if (!list.length) { var em = document.createElement('div'); em.id = 'empty'; em.textContent = path ? 'Empty. Drop files here, or ⇪ Add.' : ''; box.appendChild(em); }
+    list.forEach(function (e) {
+      var full = (path ? path + '/' : '') + e.name;
+      var it = document.createElement('div'); it.className = 'it';
+      var ic = document.createElement('div'); ic.className = 'ic';
+      if (e.category === 'image') { var im = document.createElement('img'); im.loading = 'lazy'; im.src = '/api/abyss/file?path=' + encodeURIComponent(full); ic.appendChild(im); }
+      else ic.textContent = ICON[e.category] || '◇';
+      var nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = e.name;
+      var mt = document.createElement('div'); mt.className = 'mt'; mt.textContent = e.dir ? 'folder' : fmtSize(e.size) + ' · ' + new Date(e.mtime * 1000).toLocaleDateString();
+      it.appendChild(ic); it.appendChild(nm); it.appendChild(mt);
+      it.onclick = function () { e.dir ? go(full) : view(e, full); };
+      box.appendChild(it);
+    });
+    var inFolder = !!path;
+    ['b-up', 'b-dir', 'b-blender'].forEach(function (id) { $(id).disabled = !inFolder; $(id).style.opacity = inFolder ? 1 : .4; });
+  }
+  $('q').oninput = render; $('sort').onchange = render;
+
+  function view(e, full) {
+    var url = '/api/abyss/file?path=' + encodeURIComponent(full), b = $('vbody'); b.textContent = '';
+    var el;
+    if (e.category === 'image') { el = document.createElement('img'); el.src = url; }
+    else if (e.category === 'video') { el = document.createElement('video'); el.src = url; el.controls = true; el.autoplay = true; }
+    else if (e.category === 'audio') { el = document.createElement('audio'); el.src = url; el.controls = true; el.autoplay = true; }
+    else { el = document.createElement('a'); el.href = url; el.download = e.name; el.textContent = 'Download ' + e.name; el.style.color = 'var(--acc)'; }
+    b.appendChild(el); $('vcap').textContent = e.name + ' · ' + fmtSize(e.size);
+    $('viewer').classList.remove('hidden');
+  }
+  $('b-vclose').onclick = function () { $('vbody').textContent = ''; $('viewer').classList.add('hidden'); };
+
+  function upload(files) {
+    if (!path) return alert('Open a folder first (Pictures, Music…)');
+    var list = [].slice.call(files), done = 0;
+    list.forEach(function (f) {
+      fetch('/api/abyss/upload?folder=' + encodeURIComponent(path) + '&name=' + encodeURIComponent(f.name),
+        { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/octet-stream' }, body: f })
+        .then(function (r) { return r.json(); }).then(function () { if (++done === list.length) go(path); });
+    });
+  }
+  $('b-up').onclick = function () { $('file').click(); };
+  $('file').onchange = function () { upload(this.files); this.value = ''; };
+  $('b-dir').onclick = function () {
+    var n = (prompt('New folder name') || '').trim().replace(/[\/\\]/g, '');
+    if (n) api('/api/abyss/mkdir', { json: { path: path + '/' + n } }).then(function () { go(path); }).catch(function (e) { alert(e.message); });
+  };
+  $('b-blender').onclick = function () {
+    api('/api/abyss/run', { json: { app: 'blender', sub: path } })
+      .then(function (j) { alert('Blender is opening on Beast with no network. Saves go to Abyss/' + j.result.saves_to + ' (in Blender: ~/AbyssWork).'); })
+      .catch(function (e) { alert(e.message); });
+  };
+  $('b-lock').onclick = function () { api('/api/abyss/lock', { json: {} }).then(locked); };
+  document.addEventListener('dragover', function (e) { if ($('vault').classList.contains('hidden')) return; e.preventDefault(); $('drop').classList.remove('hidden'); });
+  document.addEventListener('dragleave', function (e) { if (!e.relatedTarget) $('drop').classList.add('hidden'); });
+  document.addEventListener('drop', function (e) { e.preventDefault(); $('drop').classList.add('hidden'); if (e.dataTransfer.files.length) upload(e.dataTransfer.files); });
+
+  setInterval(function () {
+    if (!sessionEnds) return;
+    var s = Math.max(0, Math.round((sessionEnds - Date.now()) / 1000));
+    $('timer').textContent = 'locks in ' + Math.floor(s / 3600) + 'h ' + ('0' + Math.floor(s % 3600 / 60)).slice(-2) + 'm';
+    if (!s) locked();
+  }, 1000);
+
+  function locked() {
+    sessionEnds = 0; mode = 'unlock'; $('lockhint').textContent = 'Draw your pattern.'; show('lock'); setTimeout(sizeGrid, 0);
+  }
+
+  window.addEventListener('resize', sizeGrid);
+  api('/api/abyss/status').then(function (s) {
+    if (!s.setup) {
+      mode = 'setup1'; show('lock'); sizeGrid();
+      $('lockhint').textContent = 'First time: draw a new pattern (6+ dots on the 4×4 grid). It locks Abyss on every device, every 6 hours.';
+      $('b-phrase').classList.add('hidden'); $('b-card').classList.add('hidden');
+    } else if (s.session_left > 0) { sessionEnds = Date.now() + s.session_left * 1000; show('vault'); go(''); }
+    else { locked(); if (s.methods.indexOf('card') < 0) $('b-card').classList.add('hidden'); }
+  }).catch(function (e) { show('lock'); sizeGrid(); msg(e.message); });
+})();
+</script>
+</body>
+</html>
