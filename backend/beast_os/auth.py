@@ -31,13 +31,13 @@ class Auth:
         self._lock = threading.Lock()
 
     # ---- pairing
-    def new_code(self, role="owner", name=None):
+    def new_code(self, role="owner", name=None, ttl=CODE_TTL):
         if role not in ROLES:
             raise ValueError("role must be one of " + ", ".join(ROLES))
         code = f"{secrets.randbelow(10**6):06d}"
         self.s.x("DELETE FROM pair_codes WHERE expires < ?", (time.time(),))
         self.s.x("INSERT OR REPLACE INTO pair_codes(code_hash,role,name,expires) VALUES(?,?,?,?)",
-                 (_h(code), role, name, time.time() + CODE_TTL))
+                 (_h(code), role, name, time.time() + min(int(ttl), 3600)))
         return code
 
     def throttled(self, ip):

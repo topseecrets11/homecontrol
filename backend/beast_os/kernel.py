@@ -544,6 +544,7 @@ fetch('/api/pair',{method:'POST',headers:{'Content-Type':'application/json'},
 body:JSON.stringify({code:document.getElementById('code').value,name:document.getElementById('name').value})})
 .then(function(r){return r.json()}).then(function(j){if(j.ok){location.href='/'}else{document.getElementById('msg').textContent=j.error}})
 .catch(function(){document.getElementById('msg').textContent='Beast did not answer'})};
+fetch('/api/me',{credentials:'same-origin'}).then(function(r){if(r.ok&&!/code=/.test(location.hash))location.href='/'});
 var m=/code=(\d{6})/.exec(location.hash);if(m){history.replaceState(null,'','/pair');
 document.getElementById('code').value=m[1];document.getElementById('name').value=(/name=([^&]+)/.exec(location.hash)||[])[1]||'';
 if(document.getElementById('name').value){document.getElementById('name').value=decodeURIComponent(document.getElementById('name').value)}
