@@ -1,4 +1,7 @@
-"""Abyss: the encrypted vault inside Pictures, Music, Videos, Documents and Desktop.
+"""Abyss: the encrypted vault inside Pictures, Music, Videos, Documents, Desktop and Downloads.
+
+Each vault mounts at a hidden path (out of the file manager sidebar); while
+unlocked an "Abyss" link sits inside the personal folder, gone again on lock.
 
 Keys
 - One random 32-byte vault key. It is never written down in plain.
@@ -27,7 +30,8 @@ import time
 from beast_os.kernel import HOME, File, HttpError
 
 HOME_DIR = os.path.expanduser("~")
-FOLDERS = ["Pictures", "Music", "Videos", "Documents", "Desktop"]
+FOLDERS = ["Pictures", "Music", "Videos", "Documents", "Desktop", "Downloads"]
+MNT = os.path.join(HOME_DIR, ".local", "share", "beast-os", "abyss")   # same as abyss-agent
 KEYRING = os.path.join(HOME, "abyss-keyring.json")
 SOCK = os.path.join(HOME, "abyss.sock")
 SESSION_S = 6 * 3600
@@ -188,7 +192,7 @@ def safe_path(rel):
     folder, _, rest = rel.partition("/")
     if folder not in FOLDERS:
         raise ValueError("unknown Abyss folder")
-    root = os.path.realpath(os.path.join(HOME_DIR, folder, "Abyss"))
+    root = os.path.realpath(os.path.join(MNT, folder))
     full = os.path.realpath(os.path.join(root, rest))
     if full != root and not full.startswith(root + os.sep):
         raise ValueError("bad path")

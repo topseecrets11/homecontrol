@@ -24,7 +24,7 @@ locked() {
   notify-send -i security-high "Abyss is locked" "Draw your pattern to open it." 2>/dev/null || true
   exec "$0" open
 }
-mounted() { mountpoint -q "$HOME/$1/Abyss"; }
+mounted() { mountpoint -q "$HOME/.local/share/beast-os/abyss/$1"; }   # the hidden mount; ~/$1/Abyss is just the door
 
 case "${1:-open}" in
   open)

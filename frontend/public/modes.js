@@ -25,21 +25,29 @@
     wrap.appendChild(h); wrap.appendChild(cv); wrap.appendChild(msg); wrap.appendChild(cancel);
     document.body.appendChild(wrap);
     var ctx = cv.getContext('2d'); ctx.setTransform(d, 0, 0, d, 0, 0);
-    var dots = [], seq = [], drawing = false, cur = null, pad = S * 0.14, step = (S - 2 * pad) / 3;
+    var dots = [], seq = [], drawing = false, cur = null, ghost = false, pad = S * 0.14, step = (S - 2 * pad) / 3;
     for (var y = 0; y < 4; y++) for (var x = 0; x < 4; x++) dots.push([pad + x * step, pad + y * step]);
     function draw() {
       ctx.clearRect(0, 0, S, S);
-      if (seq.length) { ctx.strokeStyle = 'rgba(255,212,0,.85)'; ctx.lineWidth = 4; ctx.lineCap = ctx.lineJoin = 'round'; ctx.beginPath();
+      if (seq.length && !ghost) { ctx.strokeStyle = 'rgba(255,212,0,.85)'; ctx.lineWidth = 4; ctx.lineCap = ctx.lineJoin = 'round'; ctx.beginPath();
         seq.forEach(function (i, k) { var p = dots[i]; k ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]); });
         if (drawing && cur) ctx.lineTo(cur[0], cur[1]); ctx.stroke(); }
-      dots.forEach(function (p, i) { ctx.beginPath(); ctx.arc(p[0], p[1], seq.indexOf(i) >= 0 ? 8 : 5, 0, 6.283);
-        ctx.fillStyle = seq.indexOf(i) >= 0 ? '#ffd400' : 'rgba(216,230,216,.35)'; ctx.fill(); });
+      dots.forEach(function (p, i) { ctx.beginPath(); ctx.arc(p[0], p[1], !ghost && seq.indexOf(i) >= 0 ? 8 : 5, 0, 6.283);
+        ctx.fillStyle = !ghost && seq.indexOf(i) >= 0 ? '#ffd400' : 'rgba(216,230,216,.35)'; ctx.fill(); });
     }
     function pt(e) { var r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
     function hit(p) { for (var i = 0; i < dots.length; i++) if (Math.hypot(dots[i][0] - p[0], dots[i][1] - p[1]) < 22 && seq.indexOf(i) < 0) return i; return -1; }
-    cv.onpointerdown = function (e) { drawing = true; seq = []; msg.textContent = ''; cv.setPointerCapture(e.pointerId); var i = hit(pt(e)); if (i >= 0) seq.push(i); draw(); };
-    cv.onpointermove = function (e) { if (!drawing) return; cur = pt(e); var i = hit(cur); if (i >= 0) seq.push(i); draw(); };
-    cv.onpointerup = function () { drawing = false; draw(); if (seq.length) cb(seq.slice(), function (err) { if (err) { msg.textContent = err; seq = []; draw(); } else close(); }); };
+    cv.onpointerdown = function (e) { drawing = true; seq = []; ghost = false; msg.textContent = ''; cv.setPointerCapture(e.pointerId); var i = hit(pt(e)); if (i >= 0) seq.push(i); draw(); };
+    cv.onpointermove = function (e) {
+      if (!drawing) return; cur = pt(e); var i = hit(cur); if (i >= 0) seq.push(i);
+      // more than one grid space past the last dot: the trail vanishes (still recorded)
+      if (seq.length) { var l = dots[seq[seq.length - 1]]; if (Math.max(Math.abs(cur[0] - l[0]), Math.abs(cur[1] - l[1])) > step) ghost = true; }
+      draw();
+    };
+    cv.onpointerup = function () {
+      drawing = false; cur = null; var p = seq.slice(); seq = []; ghost = false; draw();   // nothing stays on the grid
+      if (p.length) cb(p, function (err) { if (err) msg.textContent = err; else close(); });
+    };
     function close() { wrap.remove(); }
     cancel.onclick = close;
     draw();

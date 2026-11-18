@@ -106,11 +106,11 @@
   function show(id) { ['lock', 'vault'].forEach(function (s) { $(s).classList.toggle('hidden', s !== id); }); }
 
   // ---------------- pattern grid (4x4, needs 6+ dots, no repeats) ----------------
-  var cv = $('grid'), ctx = cv.getContext('2d'), dots = [], seq = [], drawing = false, cur = null, flash = 0;
+  var cv = $('grid'), ctx = cv.getContext('2d'), dots = [], seq = [], drawing = false, cur = null, flash = 0, ghost = false, step = 0;
   function sizeGrid() {
     var r = cv.getBoundingClientRect(), d = Math.min(window.devicePixelRatio || 1, 2);
     cv.width = r.width * d; cv.height = r.height * d; ctx.setTransform(d, 0, 0, d, 0, 0);
-    dots = []; var pad = r.width * 0.14, step = (r.width - 2 * pad) / 3;
+    dots = []; var pad = r.width * 0.14; step = (r.width - 2 * pad) / 3;
     for (var y = 0; y < 4; y++) for (var x = 0; x < 4; x++) dots.push([pad + x * step, pad + y * step]);
     drawGrid();
   }
@@ -118,7 +118,7 @@
     var w = cv.width, r = cv.getBoundingClientRect();
     ctx.clearRect(0, 0, r.width, r.height);
     var col = flash > 0 ? 'rgba(255,107,107,' : 'rgba(123,92,255,';
-    if (seq.length) {
+    if (seq.length && !ghost) {
       ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
       ctx.strokeStyle = col + '0.85)'; ctx.shadowColor = col + '0.9)'; ctx.shadowBlur = 14;
       ctx.beginPath();
@@ -127,7 +127,7 @@
       ctx.stroke(); ctx.shadowBlur = 0;
     }
     dots.forEach(function (d, i) {
-      var on = seq.indexOf(i) >= 0;
+      var on = !ghost && seq.indexOf(i) >= 0;
       ctx.beginPath(); ctx.arc(d[0], d[1], on ? 9 : 5, 0, 6.283);
       ctx.fillStyle = on ? '#c7b8ff' : 'rgba(216,230,216,.35)'; ctx.fill();
       if (on) { ctx.beginPath(); ctx.arc(d[0], d[1], 16, 0, 6.283); ctx.strokeStyle = col + '0.5)'; ctx.lineWidth = 1.5; ctx.stroke(); }
@@ -138,17 +138,31 @@
     return -1;
   }
   function pt(e) { var r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
-  cv.addEventListener('pointerdown', function (e) { drawing = true; seq = []; flash = 0; msg(''); cv.setPointerCapture(e.pointerId); var i = hit(pt(e)); if (i >= 0) seq.push(i); drawGrid(); });
-  cv.addEventListener('pointermove', function (e) { if (!drawing) return; cur = pt(e); var i = hit(cur); if (i >= 0) seq.push(i); drawGrid(); });
-  cv.addEventListener('pointerup', function () { drawing = false; cur = null; drawGrid(); if (seq.length) patternDone(seq.slice()); });
-  function wrong(t) { flash = 1; drawGrid(); msg(t); setTimeout(function () { seq = []; flash = 0; drawGrid(); }, 900); }
+  cv.addEventListener('pointerdown', function (e) { drawing = true; seq = []; flash = 0; ghost = false; msg(''); cv.setPointerCapture(e.pointerId); var i = hit(pt(e)); if (i >= 0) seq.push(i); drawGrid(); });
+  cv.addEventListener('pointermove', function (e) {
+    if (!drawing) return; cur = pt(e); var i = hit(cur); if (i >= 0) seq.push(i);
+    // more than one grid space past the last dot: the trail vanishes (still recorded)
+    if (seq.length) { var l = dots[seq[seq.length - 1]]; if (Math.max(Math.abs(cur[0] - l[0]), Math.abs(cur[1] - l[1])) > step) ghost = true; }
+    drawGrid();
+  });
+  cv.addEventListener('pointerup', function () {
+    drawing = false; cur = null; var p = seq.slice(); wipe();   // nothing stays on the grid
+    if (p.length) patternDone(p);
+  });
+  function wipe() { seq = []; ghost = false; drawing = false; cur = null; if (dots.length) drawGrid(); }
+  function wrong(t) {
+    wipe(); msg(t); cv.style.borderColor = 'rgba(255,107,107,.7)';
+    setTimeout(function () { cv.style.borderColor = ''; }, 900);
+  }
+  document.addEventListener('visibilitychange', wipe);
+  window.addEventListener('pagehide', wipe);
 
   function patternDone(p) {
     if (p.length < 6) return wrong('Use at least 6 dots.');
     if (mode === 'unlock') {
       api('/api/abyss/unlock', { json: { method: 'pattern', pattern: p } }).then(opened).catch(function (e) { wrong(e.message); });
     } else if (mode === 'setup1') {
-      firstPattern = p; seq = []; drawGrid(); mode = 'setup2'; $('lockhint').textContent = 'Draw it again to confirm.';
+      firstPattern = p; wipe(); mode = 'setup2'; $('lockhint').textContent = 'Draw it again to confirm.';
     } else if (mode === 'setup2') {
       if (p.join() !== firstPattern.join()) { mode = 'setup1'; firstPattern = null; $('lockhint').textContent = 'Didn\'t match. Draw your new pattern.'; return wrong('Patterns didn\'t match.'); }
       setupPhrase = prompt('Backup phrase (12+ characters). Write it down somewhere safe. It unlocks Abyss if you forget the pattern.') || '';
@@ -158,7 +172,7 @@
     }
   }
 
-  $('b-clear').onclick = function () { seq = []; msg(''); drawGrid(); };
+  $('b-clear').onclick = function () { wipe(); msg(''); };
   $('b-phrase').onclick = function () { $('phrasebox').classList.toggle('hidden'); $('phrase').focus(); };
   $('b-phrase-go').onclick = function () {
     api('/api/abyss/unlock', { json: { method: 'phrase', phrase: $('phrase').value } }).then(opened).catch(function (e) { msg(e.message); });
@@ -172,7 +186,7 @@
   // ---------------- vault ----------------
   var ICON = { folder: '▤', image: '◩', video: '▶', audio: '♪', doc: '≣', '3d': '◈', other: '◇' };
   var CATS = [['all', 'All'], ['folder', 'Folders'], ['image', 'Images'], ['video', 'Video'], ['audio', 'Audio'], ['doc', 'Docs'], ['3d', '3D'], ['other', 'Other']];
-  function opened(j) { sessionEnds = Date.now() + ((j && j.session_left) || 21600) * 1000; msg(''); show('vault'); go(''); }
+  function opened(j) { wipe(); sessionEnds = Date.now() + ((j && j.session_left) || 21600) * 1000; msg(''); show('vault'); go(''); }
   function fmtSize(n) { return n > 1e9 ? (n / 1e9).toFixed(1) + ' GB' : n > 1e6 ? (n / 1e6).toFixed(1) + ' MB' : n > 1e3 ? Math.round(n / 1e3) + ' KB' : n + ' B'; }
 
   function go(p) {
@@ -276,7 +290,7 @@
   }, 1000);
 
   function locked() {
-    sessionEnds = 0; mode = 'unlock'; $('lockhint').textContent = 'Draw your pattern.'; show('lock'); setTimeout(sizeGrid, 0);
+    wipe(); sessionEnds = 0; mode = 'unlock'; $('lockhint').textContent = 'Draw your pattern.'; show('lock'); setTimeout(sizeGrid, 0);
   }
 
   window.addEventListener('resize', sizeGrid);

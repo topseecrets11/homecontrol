@@ -18,7 +18,11 @@ import sys
 
 HOME = os.path.expanduser("~")
 SOCK = os.path.join(HOME, ".config", "beast-os", "abyss.sock")
-FOLDERS = ["Pictures", "Music", "Videos", "Documents", "Desktop"]
+FOLDERS = ["Pictures", "Music", "Videos", "Documents", "Desktop", "Downloads"]
+# Vaults mount at a hidden path (a dot in the path keeps them out of the file
+# manager's sidebar). While unlocked, each personal folder gets an "Abyss" link
+# into its vault; locking removes the link, so a locked folder shows nothing.
+MNT = os.path.join(HOME, ".local", "share", "beast-os", "abyss")
 # Apps that can open inside Abyss: no network, saves stay in the Abyss folder.
 APPS = {"blender": ["blender"], "kdenlive": ["kdenlive"], "gimp": ["gimp"], "inkscape": ["inkscape"],
         "audacity": ["audacity"], "libreoffice": ["libreoffice"], "vlc": ["vlc"], "files": ["nemo", "--no-desktop", "."]}
@@ -30,12 +34,41 @@ def cipher(folder):
     return os.path.join(HOME, folder, ".abyss")
 
 
+def mnt(folder):
+    return os.path.join(MNT, folder)
+
+
 def plain(folder):
+    """The visible door inside the personal folder (a link, only there while unlocked)."""
     return os.path.join(HOME, folder, "Abyss")
 
 
 def mounted(path):
-    return os.path.ismount(path)
+    return os.path.ismount(os.path.realpath(path))
+
+
+def show_door(f):
+    p = plain(f)
+    if os.path.islink(p):
+        if os.readlink(p) == mnt(f):
+            return
+        os.unlink(p)
+    elif os.path.isdir(p):
+        if os.path.ismount(p) or os.listdir(p):
+            return               # an old-style mount or real files: never touch it
+        os.rmdir(p)
+    elif os.path.exists(p):
+        return
+    os.makedirs(os.path.join(HOME, f), exist_ok=True)
+    os.symlink(mnt(f), p)
+
+
+def hide_door(f):
+    p = plain(f)
+    if os.path.islink(p) and os.readlink(p) == mnt(f):
+        os.unlink(p)
+    elif os.path.isdir(p) and not os.path.ismount(p) and not os.listdir(p):
+        os.rmdir(p)              # empty leftover from the old layout
 
 
 def op_init(req):
@@ -49,7 +82,6 @@ def op_init(req):
         r = subprocess.run(["gocryptfs", "-init", "-q", c], input=req["password"] + "\n",
                            capture_output=True, text=True, timeout=120)
         out[f] = "ok" if r.returncode == 0 else ("error: " + r.stderr.strip()[-200:])
-        os.makedirs(plain(f), mode=0o700, exist_ok=True)
     return out
 
 
@@ -65,13 +97,18 @@ def op_mount(req):
             if r.returncode:
                 out[f] = "error: " + r.stderr.strip()[-200:]
                 continue
-        os.makedirs(p, mode=0o700, exist_ok=True)
-        if mounted(p):
-            out[f] = "mounted"
-            continue
-        r = subprocess.run(["gocryptfs", "-q", "-noprealloc", c, p], input=req["password"] + "\n",
-                           capture_output=True, text=True, timeout=120)
-        out[f] = "mounted" if r.returncode == 0 else ("error: " + r.stderr.strip()[-200:])
+        m = mnt(f)
+        if os.path.ismount(p) and not os.path.islink(p):
+            subprocess.run(["fusermount3", "-u", p], capture_output=True)   # old layout: move it to the hidden path
+        os.makedirs(m, mode=0o700, exist_ok=True)
+        if not os.path.ismount(m):
+            r = subprocess.run(["gocryptfs", "-q", "-noprealloc", c, m], input=req["password"] + "\n",
+                               capture_output=True, text=True, timeout=120)
+            if r.returncode:
+                out[f] = "error: " + r.stderr.strip()[-200:]
+                continue
+        show_door(f)
+        out[f] = "mounted"
     return out
 
 
@@ -80,20 +117,27 @@ def op_umount(req):
     subprocess.run(["systemctl", "--user", "stop", SLICE], capture_output=True, timeout=60)
     out = {}
     for f in FOLDERS:
-        p = plain(f)
-        if mounted(p):
-            r = subprocess.run(["fusermount3", "-u", p], capture_output=True, text=True)
-            if r.returncode:
-                r = subprocess.run(["fusermount3", "-uz", p], capture_output=True, text=True)
-            out[f] = "locked" if r.returncode == 0 else ("error: " + r.stderr.strip()[-200:])
-        else:
-            out[f] = "locked"
+        hide_door(f)
+        out[f] = "locked"
+        for p in (mnt(f), plain(f)):
+            if os.path.ismount(p) and not os.path.islink(p):
+                r = subprocess.run(["fusermount3", "-u", p], capture_output=True, text=True)
+                if r.returncode:
+                    r = subprocess.run(["fusermount3", "-uz", p], capture_output=True, text=True)
+                if r.returncode:
+                    out[f] = "error: " + r.stderr.strip()[-200:]
+        hide_door(f)
     return out
 
 
 def op_status(req):
-    return {f: {"setup": os.path.exists(os.path.join(cipher(f), "gocryptfs.conf")),
-                "mounted": mounted(plain(f))} for f in FOLDERS}
+    out = {}
+    for f in FOLDERS:
+        m = os.path.ismount(mnt(f))
+        if not m:
+            hide_door(f)         # e.g. after a crash or reboot: no door while locked
+        out[f] = {"setup": os.path.exists(os.path.join(cipher(f), "gocryptfs.conf")), "mounted": m}
+    return out
 
 
 def op_run(req):
@@ -103,8 +147,8 @@ def op_run(req):
     folder, _, rest = sub.partition("/")
     if folder not in FOLDERS or ".." in sub.split("/"):
         raise ValueError("bad sub-vault")
-    root = plain(folder)
-    if not mounted(root):
+    root = mnt(folder)
+    if not os.path.ismount(root):
         raise PermissionError("Abyss is locked")
     work = os.path.join(root, rest) if rest else (root if app == "files" else os.path.join(root, app.capitalize()))
     os.makedirs(work, mode=0o700, exist_ok=True)
@@ -225,7 +269,7 @@ def op_fg_presets(req):
 def _inside_abyss(path):
     real = os.path.realpath(path)
     for f in FOLDERS:
-        root = os.path.realpath(plain(f))
+        root = os.path.realpath(mnt(f))
         if (real == root or real.startswith(root + os.sep)) and os.path.ismount(root):
             return real
     raise PermissionError("Storyboard files must be inside an unlocked Abyss folder")

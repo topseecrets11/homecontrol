@@ -81,7 +81,7 @@ def register(k):
                 raise ValueError("bad phone number")
             cli("-d", d, "--send-sms", str(b["text"])[:1000], "--destination", num)
         elif a == "photo":
-            dest_dir = os.path.join(HOME_DIR, "Pictures", "Abyss")
+            dest_dir = os.path.join(HOME_DIR, ".local", "share", "beast-os", "abyss", "Pictures")
             if not os.path.ismount(dest_dir):
                 raise HttpError(423, "Open Abyss first, so the photo lands encrypted")
             os.makedirs(os.path.join(dest_dir, "Phone"), exist_ok=True)
