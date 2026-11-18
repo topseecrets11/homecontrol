@@ -1,0 +1,18 @@
+{
+  "prompts": [
+    {"id": "resume-beast-os", "title": "Resume the Beast OS build", "tags": ["beast-os"],
+     "text": "Read ~/.claude/plans/misty-wondering-wren.md and ~/homecontrol, check `systemctl --user status beast-os`, then carry on with the next unfinished phase. Beast OS runs on {{beast.lan}}:{{beast.port}}."},
+    {"id": "event-health", "title": "Health check on the Event", "tags": ["the-event"],
+     "text": "ssh {{event.ssh}} and report: disk space on /media/topsee_SERVER, docker ps (Home Assistant + Jellyfin), memory, and anything failed in systemctl. The Event is {{event.lan}} (Tailscale {{event.tailscale}})."},
+    {"id": "ha-unavailable", "title": "Home Assistant: what's unavailable", "tags": ["home"],
+     "text": "Using Home Assistant at {{ha.url}}, list every entity that is unavailable or unknown and suggest the fix for each."},
+    {"id": "jellyfin-restart", "title": "Restart Jellyfin on the Event", "tags": ["media"],
+     "text": "ssh {{event.ssh}}, restart the jellyfin docker container, set restart policy unless-stopped, and confirm {{jellyfin.url}} answers."},
+    {"id": "tablet-tunnel", "title": "Tablet tunnel check", "tags": ["tablet"],
+     "text": "The tablet reaches Beast OS through an autossh tunnel to {{beast.lan}}. Check sshd logs on Beast for the tablet key and confirm {{tablet.kiosk}} loads."},
+    {"id": "abyss-backup", "title": "Back up Abyss ciphertext to the Event", "tags": ["abyss"],
+     "text": "rsync the encrypted .abyss folders from Beast to {{event.ssh}}:/media/topsee_SERVER/Abyss/backup/ (ciphertext only, never the mounted plaintext) and report sizes."},
+    {"id": "hermes-status", "title": "Hermes / Ollama status", "tags": ["virgil"],
+     "text": "Check `systemctl --user status ollama`, list models with ~/.local/opt/ollama/bin/ollama list, and benchmark the vision model with --verbose. Ollama listens on {{ollama.url}} only."}
+  ]
+}

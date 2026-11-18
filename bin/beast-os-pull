@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Pull an Ollama model without opening the main (offline) Ollama to the internet:
+# a short-lived second server on 127.0.0.1:11435 downloads into the same store.
+set -euo pipefail
+[ $# -ge 1 ] || { echo "usage: beast-os-pull MODEL [MODEL...]"; exit 1; }
+BIN="$HOME/.local/opt/ollama/bin/ollama"
+OLLAMA_HOST=127.0.0.1:11435 "$BIN" serve >/dev/null 2>&1 &
+PID=$!; trap 'kill $PID 2>/dev/null' EXIT
+for i in $(seq 30); do OLLAMA_HOST=127.0.0.1:11435 "$BIN" list >/dev/null 2>&1 && break; sleep 0.5; done
+for m in "$@"; do OLLAMA_HOST=127.0.0.1:11435 "$BIN" pull "$m"; done

@@ -1,0 +1,7 @@
+{
+  "id": "prompts",
+  "title": "Prompts",
+  "tab": {"label": "PROMPTS", "icon": "❯", "order": 50, "view": "frame", "src": "/m/prompts/"},
+  "role": "tablet",
+  "web": "web"
+}

@@ -32,7 +32,7 @@ MAX_UPLOAD = 64 << 20       # per-route override for uploads / voice
 CSP = ("default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob: data:; "
        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; "
        "script-src 'self' 'unsafe-inline'; worker-src 'self' blob:; connect-src 'self'; "
-       "frame-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'self'")
+       "frame-src 'self'{frames}; frame-ancestors 'self'; base-uri 'none'; form-action 'self'")
 
 PUBLIC_PATHS = {"/pair", "/api/pair", "/icon.svg", "/manifest.json", "/favicon.ico"}
 
@@ -116,6 +116,14 @@ class Kernel:
         self.current_module = None
         self.modules = registry.load_all(MODULES, self, log)
         self.by_id = {m.id: m for m in self.modules}
+        # modules may show a loopback-only app (e.g. War Room on 127.0.0.1:8765) in their tab
+        frames = set()
+        for m in self.modules:
+            src = (m.meta.get("tab") or {}).get("src", "")
+            if src.startswith("http://127.0.0.1:"):
+                frames.add("/".join(src.split("/", 3)[:3]))
+        frames = sorted(frames)
+        self.csp = CSP.format(frames="".join(" " + f for f in frames))
 
     # ---- module API
     def route(self, method, path, fn, role="owner", prefix=False, max_body=MAX_JSON, stream=False):
@@ -168,7 +176,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
         self.send_header("X-Frame-Options", "SAMEORIGIN")
-        self.send_header("Content-Security-Policy", CSP)
+        self.send_header("Content-Security-Policy", KERNEL.csp)
 
     def send_json(self, obj, code=200, extra=None):
         b = json.dumps(obj).encode()

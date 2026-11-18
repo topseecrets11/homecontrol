@@ -1,0 +1,28 @@
+# Beast OS kernel as a system service so the outbound firewall (IPAddressDeny)
+# actually applies: Beast OS can talk to Beast, the LAN and the tailnet, never
+# the internet ("one-way"). Runs as the normal user.
+[Unit]
+Description=Beast OS kernel (shell, modules, house control API)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=topsee_crets
+Group=topsee_crets
+Environment=HOME=/home/topsee_crets
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/home/topsee_crets/homecontrol/bin/beast-os serve --port 8090
+Restart=always
+RestartSec=3
+Nice=5
+MemoryMax=200M
+CPUQuota=50%
+NoNewPrivileges=yes
+ProtectSystem=full
+PrivateTmp=no
+IPAddressDeny=any
+IPAddressAllow=localhost 192.168.1.0/24 100.64.0.0/10 fd7a:115c:a1e0::/48 255.255.255.255
+
+[Install]
+WantedBy=multi-user.target
