@@ -1,0 +1,9 @@
+{
+  "port": 8080,
+  "homeassistant": {"url": "http://EVENT-IP:8123"},
+  "jellyfin": {"url": "http://EVENT-IP:8096"},
+  "llm": {"url": "http://127.0.0.1:11434/v1", "model": "hermes3:3b"},
+  "ha_allow": ["light.*", "switch.turn_on", "switch.turn_off", "switch.toggle", "media_player.*", "scene.turn_on", "script.turn_on"],
+  "devices": [],
+  "scenes": {}
+}

@@ -1,0 +1,97 @@
+#!/usr/bin/env python3
+"""beast-os: run and manage the Beast OS kernel.
+
+  beast-os serve [--port N] [--host H]   run the kernel (systemd runs this)
+  beast-os pair [--role owner|tablet|guest] [--name NAME]
+                                         make a 6-digit pairing code (5 min)
+  beast-os devices                       list paired devices
+  beast-os revoke NAME                   unpair a device
+  beast-os init                          create ~/.config/beast-os, importing beast-hub's config
+"""
+import argparse
+import json
+import os
+import shutil
+import sys
+import time
+
+REPO = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(__file__)), ".."))
+sys.path.insert(0, os.path.join(REPO, "backend"))
+
+from beast_os import kernel  # noqa: E402
+from beast_os.auth import Auth  # noqa: E402
+from beast_os.store import Store  # noqa: E402
+
+SECRET_KEYS = {("homeassistant", "token"), ("jellyfin", "api_key"), ("llm", "api_key")}
+
+
+def store():
+    return Store(os.path.join(kernel.HOME, "beast-os.db"))
+
+
+def cmd_init(a):
+    home = kernel.HOME
+    os.makedirs(home, mode=0o700, exist_ok=True)
+    os.chmod(home, 0o700)
+    beast, secrets = os.path.join(home, "beast.json"), os.path.join(home, "secrets.json")
+    if os.path.exists(beast):
+        print(f"{beast} already exists, leaving it alone")
+        return
+    src = os.path.expanduser(a.from_hub)
+    cfg = {}
+    if os.path.exists(src):
+        with open(src) as f:
+            cfg = json.load(f)
+        print(f"imported {src}")
+    else:
+        with open(os.path.join(REPO, "config", "beast.example.json")) as f:
+            cfg = json.load(f)
+    sec = {}
+    for sect, key in SECRET_KEYS:
+        if sect in cfg and key in cfg[sect]:
+            sec.setdefault(sect, {})[key] = cfg[sect].pop(key)
+    cfg.setdefault("llm", {}).update({"url": "http://127.0.0.1:11434/v1", "model": "hermes3:3b",
+                                      "system": "You are Hermes, the brain behind Virgil, the user's own assistant in Beast OS. "
+                                                "Answer in one or two short spoken sentences."})
+    cfg.setdefault("ha_allow", ["light.*", "switch.turn_on", "switch.turn_off", "switch.toggle",
+                                "media_player.*", "scene.turn_on", "script.turn_on"])
+    for path, data in ((beast, cfg), (secrets, sec)):
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w") as f:
+            json.dump(data, f, indent=2)
+        print("wrote", path)
+    if not os.path.exists(os.path.join(home, "endpoints.json")):
+        shutil.copy(os.path.join(REPO, "config", "endpoints.example.json"), os.path.join(home, "endpoints.json"))
+        print("wrote", os.path.join(home, "endpoints.json"))
+
+
+def cmd_pair(a):
+    code = Auth(store()).new_code(a.role, a.name)
+    print(f"\n   Pairing code:  {code[:3]} {code[3:]}     role: {a.role}   (valid 5 minutes)\n")
+    print("   On the device, open Beast OS and type it in.")
+
+
+def cmd_devices(a):
+    for d in Auth(store()).devices():
+        seen = time.strftime("%Y-%m-%d %H:%M", time.localtime(d["last_seen"])) if d["last_seen"] else "-"
+        print(f"{d['name']:<24} {d['role']:<7} last seen {seen}")
+
+
+def cmd_revoke(a):
+    Auth(store()).revoke(a.name)
+    print("revoked", a.name)
+
+
+def cmd_serve(a):
+    kernel.serve(a.host, a.port)
+
+
+p = argparse.ArgumentParser(prog="beast-os")
+sp = p.add_subparsers(dest="cmd", required=True)
+s = sp.add_parser("serve"); s.add_argument("--port", type=int); s.add_argument("--host", default="0.0.0.0"); s.set_defaults(fn=cmd_serve)
+s = sp.add_parser("pair"); s.add_argument("--role", default="owner", choices=["owner", "tablet", "guest"]); s.add_argument("--name"); s.set_defaults(fn=cmd_pair)
+s = sp.add_parser("devices"); s.set_defaults(fn=cmd_devices)
+s = sp.add_parser("revoke"); s.add_argument("name"); s.set_defaults(fn=cmd_revoke)
+s = sp.add_parser("init"); s.add_argument("--from-hub", default="~/beast-hub/config.json"); s.set_defaults(fn=cmd_init)
+args = p.parse_args()
+args.fn(args)

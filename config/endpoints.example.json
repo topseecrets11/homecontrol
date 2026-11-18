@@ -1,0 +1,9 @@
+{
+  "beast":  {"lan": "BEAST-LAN-IP", "tailscale": "feed-the-beast", "port": 8080},
+  "event":  {"name": "the Event", "lan": "EVENT-LAN-IP", "tailscale": "event-horizon", "ssh": "eh"},
+  "ha":     {"url": "http://EVENT-LAN-IP:8123"},
+  "jellyfin": {"url": "http://EVENT-LAN-IP:8096"},
+  "ollama": {"url": "http://127.0.0.1:11434"},
+  "warroom": {"url": "http://127.0.0.1:8765"},
+  "tablet": {"kiosk": "http://localhost:8123/local/deck/"}
+}

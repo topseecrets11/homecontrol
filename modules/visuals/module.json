@@ -1,0 +1,7 @@
+{
+  "id": "visuals",
+  "title": "Second Brain",
+  "tab": {"label": "BRAIN", "icon": "✺", "order": 30, "view": "frame", "src": "/m/visuals/proto.html"},
+  "role": "tablet",
+  "web": "web"
+}

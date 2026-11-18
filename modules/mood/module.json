@@ -1,0 +1,6 @@
+{
+  "id": "mood",
+  "title": "Mood",
+  "tab": {"label": "MOOD", "icon": "◐", "order": 40, "view": "frame", "src": "/m/visuals/proto.html?view=mood"},
+  "role": "tablet"
+}

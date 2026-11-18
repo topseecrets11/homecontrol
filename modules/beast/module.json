@@ -1,0 +1,7 @@
+{
+  "id": "beast",
+  "title": "Beast Controls",
+  "tab": {"label": "BEAST", "icon": "⚡", "order": 5, "view": "frame", "src": "/m/beast/"},
+  "role": "guest",
+  "web": "web"
+}
