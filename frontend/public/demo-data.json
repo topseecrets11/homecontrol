@@ -1,0 +1,811 @@
+{
+ "source": "dummyjson.com, fetched once on 2026-11-18, stored locally; no network used at runtime",
+ "products": [
+  {
+   "name": "Apple MacBook Pro 14 Inch Space Grey",
+   "price": 1999.99,
+   "stock": 24,
+   "rating": 3.65,
+   "category": "laptops"
+  },
+  {
+   "name": "Asus Zenbook Pro Dual Screen Laptop",
+   "price": 1799.99,
+   "stock": 45,
+   "rating": 3.95,
+   "category": "laptops"
+  },
+  {
+   "name": "Huawei Matebook X Pro",
+   "price": 1399.99,
+   "stock": 75,
+   "rating": 4.98,
+   "category": "laptops"
+  },
+  {
+   "name": "iPhone 5s",
+   "price": 199.99,
+   "stock": 25,
+   "rating": 2.83,
+   "category": "smartphones"
+  },
+  {
+   "name": "iPhone 6",
+   "price": 299.99,
+   "stock": 60,
+   "rating": 3.41,
+   "category": "smartphones"
+  },
+  {
+   "name": "iPhone 13 Pro",
+   "price": 1099.99,
+   "stock": 56,
+   "rating": 4.12,
+   "category": "smartphones"
+  },
+  {
+   "name": "iPad Mini 2021 Starlight",
+   "price": 499.99,
+   "stock": 47,
+   "rating": 3.18,
+   "category": "tablets"
+  },
+  {
+   "name": "Samsung Galaxy Tab S8 Plus Grey",
+   "price": 599.99,
+   "stock": 62,
+   "rating": 4.68,
+   "category": "tablets"
+  },
+  {
+   "name": "Samsung Galaxy Tab White",
+   "price": 349.99,
+   "stock": 92,
+   "rating": 3.72,
+   "category": "tablets"
+  },
+  {
+   "name": "Amazon Echo Plus",
+   "price": 99.99,
+   "stock": 61,
+   "rating": 4.99,
+   "category": "mobile-accessories"
+  },
+  {
+   "name": "Apple Airpods",
+   "price": 129.99,
+   "stock": 67,
+   "rating": 4.15,
+   "category": "mobile-accessories"
+  },
+  {
+   "name": "Apple AirPods Max Silver",
+   "price": 549.99,
+   "stock": 59,
+   "rating": 3.47,
+   "category": "mobile-accessories"
+  }
+ ],
+ "carts": [
+  {
+   "total": 13037.88,
+   "items": [
+    {
+     "name": "Blue Frock",
+     "price": 29.99,
+     "qty": 4
+    },
+    {
+     "name": "Generic Motorcycle",
+     "price": 3999.99,
+     "qty": 3
+    },
+    {
+     "name": "iPhone 6",
+     "price": 299.99,
+     "qty": 3
+    },
+    {
+     "name": "Baseball Ball",
+     "price": 8.99,
+     "qty": 2
+    }
+   ]
+  },
+  {
+   "total": 139.93,
+   "items": [
+    {
+     "name": "Man Short Sleeve Shirt",
+     "price": 19.99,
+     "qty": 5
+    },
+    {
+     "name": "Apple iPhone Charger",
+     "price": 19.99,
+     "qty": 2
+    }
+   ]
+  },
+  {
+   "total": 1794.85,
+   "items": [
+    {
+     "name": "Fish Steak",
+     "price": 14.99,
+     "qty": 1
+    },
+    {
+     "name": "iPhone 13 Pro",
+     "price": 1099.99,
+     "qty": 1
+    },
+    {
+     "name": "Realme X",
+     "price": 299.99,
+     "qty": 1
+    },
+    {
+     "name": "Man Short Sleeve Shirt",
+     "price": 19.99,
+     "qty": 5
+    },
+    {
+     "name": "Dior J'adore",
+     "price": 89.99,
+     "qty": 2
+    },
+    {
+     "name": "Party Glasses",
+     "price": 19.99,
+     "qty": 5
+    }
+   ]
+  },
+  {
+   "total": 689.93,
+   "items": [
+    {
+     "name": "Sports Sneakers Off White Red",
+     "price": 109.99,
+     "qty": 3
+    },
+    {
+     "name": "Dior J'adore",
+     "price": 89.99,
+     "qty": 4
+    }
+   ]
+  },
+  {
+   "total": 1467.88,
+   "items": [
+    {
+     "name": "Samsung Galaxy Tab White",
+     "price": 349.99,
+     "qty": 4
+    },
+    {
+     "name": "Soft Drinks",
+     "price": 1.99,
+     "qty": 4
+    },
+    {
+     "name": "Powder Canister",
+     "price": 14.99,
+     "qty": 4
+    }
+   ]
+  },
+  {
+   "total": 55453.86,
+   "items": [
+    {
+     "name": "Rolex Datejust Women",
+     "price": 10999.99,
+     "qty": 5
+    },
+    {
+     "name": "Realme XT",
+     "price": 349.99,
+     "qty": 1
+    },
+    {
+     "name": "Classic Sun Glasses",
+     "price": 24.99,
+     "qty": 4
+    },
+    {
+     "name": "Water",
+     "price": 0.99,
+     "qty": 4
+    }
+   ]
+  },
+  {
+   "total": 1229.86,
+   "items": [
+    {
+     "name": "Electric Stove",
+     "price": 49.99,
+     "qty": 1
+    },
+    {
+     "name": "Vivo X21",
+     "price": 499.99,
+     "qty": 1
+    },
+    {
+     "name": "Dolce Shine Eau de",
+     "price": 69.99,
+     "qty": 2
+    },
+    {
+     "name": "Vaseline Men Body and Face Lotion",
+     "price": 9.99,
+     "qty": 4
+    },
+    {
+     "name": "Electric Stove",
+     "price": 49.99,
+     "qty": 1
+    },
+    {
+     "name": "Puma Future Rider Trainers",
+     "price": 89.99,
+     "qty": 5
+    }
+   ]
+  },
+  {
+   "total": 6337.83,
+   "items": [
+    {
+     "name": "Cat Food",
+     "price": 8.99,
+     "qty": 2
+    },
+    {
+     "name": "Black Whisk",
+     "price": 9.99,
+     "qty": 3
+    },
+    {
+     "name": "Blue Frock",
+     "price": 29.99,
+     "qty": 4
+    },
+    {
+     "name": "Annibale Colombo Bed",
+     "price": 1899.99,
+     "qty": 3
+    },
+    {
+     "name": "iPhone 12 Silicone Case with MagSafe Plum",
+     "price": 29.99,
+     "qty": 4
+    },
+    {
+     "name": "Apple Watch Series 4 Gold",
+     "price": 349.99,
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "total": 29709.9,
+   "items": [
+    {
+     "name": "Essence Mascara Lash Princess",
+     "price": 9.99,
+     "qty": 3
+    },
+    {
+     "name": "Rolex Submariner Watch",
+     "price": 13999.99,
+     "qty": 2
+    },
+    {
+     "name": "Samsung Galaxy S8",
+     "price": 499.99,
+     "qty": 3
+    },
+    {
+     "name": "Puma Future Rider Trainers",
+     "price": 89.99,
+     "qty": 2
+    }
+   ]
+  },
+  {
+   "total": 152.44,
+   "items": [
+    {
+     "name": "Tissue Paper Box",
+     "price": 2.49,
+     "qty": 1
+    },
+    {
+     "name": "iPhone 12 Silicone Case with MagSafe Plum",
+     "price": 29.99,
+     "qty": 5
+    }
+   ]
+  },
+  {
+   "total": 61831.75,
+   "items": [
+    {
+     "name": "MotoGP CI.H1",
+     "price": 14999.99,
+     "qty": 4
+    },
+    {
+     "name": "Apple AirPods Max Silver",
+     "price": 549.99,
+     "qty": 2
+    },
+    {
+     "name": "Egg Slicer",
+     "price": 6.99,
+     "qty": 4
+    },
+    {
+     "name": "Green Bell Pepper",
+     "price": 1.29,
+     "qty": 3
+    },
+    {
+     "name": "Samsung Galaxy Tab White",
+     "price": 349.99,
+     "qty": 2
+    }
+   ]
+  },
+  {
+   "total": 37767.32,
+   "items": [
+    {
+     "name": "Sportbike Motorcycle",
+     "price": 7499.99,
+     "qty": 1
+    },
+    {
+     "name": "Ice Cream",
+     "price": 5.49,
+     "qty": 5
+    },
+    {
+     "name": "Rolex Submariner Watch",
+     "price": 13999.99,
+     "qty": 2
+    },
+    {
+     "name": "Dior J'adore",
+     "price": 89.99,
+     "qty": 1
+    },
+    {
+     "name": "Blue Frock",
+     "price": 29.99,
+     "qty": 5
+    },
+    {
+     "name": "Knoll Saarinen Executive Conference Chair",
+     "price": 499.99,
+     "qty": 4
+    }
+   ]
+  },
+  {
+   "total": 16.54,
+   "items": [
+    {
+     "name": "Potatoes",
+     "price": 2.29,
+     "qty": 2
+    },
+    {
+     "name": "Eggs",
+     "price": 2.99,
+     "qty": 4
+    }
+   ]
+  },
+  {
+   "total": 209.9,
+   "items": [
+    {
+     "name": "Family Tree Photo Frame",
+     "price": 29.99,
+     "qty": 4
+    },
+    {
+     "name": "Pan",
+     "price": 24.99,
+     "qty": 1
+    },
+    {
+     "name": "Lunch Box",
+     "price": 12.99,
+     "qty": 5
+    }
+   ]
+  },
+  {
+   "total": 249.95,
+   "items": [
+    {
+     "name": "Hand Blender",
+     "price": 34.99,
+     "qty": 2
+    },
+    {
+     "name": "Apple MagSafe Battery Pack",
+     "price": 99.99,
+     "qty": 1
+    },
+    {
+     "name": "Basketball Rim",
+     "price": 39.99,
+     "qty": 2
+    }
+   ]
+  },
+  {
+   "total": 384.92,
+   "items": [
+    {
+     "name": "Cooking Oil",
+     "price": 4.99,
+     "qty": 5
+    },
+    {
+     "name": "Sports Sneakers Off White & Red",
+     "price": 119.99,
+     "qty": 3
+    }
+   ]
+  },
+  {
+   "total": 5531.34,
+   "items": [
+    {
+     "name": "iPhone 13 Pro",
+     "price": 1099.99,
+     "qty": 5
+    },
+    {
+     "name": "American Football",
+     "price": 19.99,
+     "qty": 1
+    },
+    {
+     "name": "Green Bell Pepper",
+     "price": 1.29,
+     "qty": 5
+    },
+    {
+     "name": "Green Chili Pepper",
+     "price": 0.99,
+     "qty": 5
+    }
+   ]
+  },
+  {
+   "total": 128999.9,
+   "items": [
+    {
+     "name": "Dodge Hornet GT Plus",
+     "price": 24999.99,
+     "qty": 5
+    },
+    {
+     "name": "Watch Gold for Women",
+     "price": 799.99,
+     "qty": 5
+    }
+   ]
+  },
+  {
+   "total": 22142.88,
+   "items": [
+    {
+     "name": "Dog Food",
+     "price": 10.99,
+     "qty": 3
+    },
+    {
+     "name": "Electric Stove",
+     "price": 49.99,
+     "qty": 1
+    },
+    {
+     "name": "Rolex Datejust",
+     "price": 10999.99,
+     "qty": 2
+    },
+    {
+     "name": "Silver Pot With Glass Cap",
+     "price": 39.99,
+     "qty": 1
+    },
+    {
+     "name": "Plate",
+     "price": 3.99,
+     "qty": 5
+    }
+   ]
+  },
+  {
+   "total": 4711.88,
+   "items": [
+    {
+     "name": "iPhone 13 Pro",
+     "price": 1099.99,
+     "qty": 4
+    },
+    {
+     "name": "Protein Powder",
+     "price": 19.99,
+     "qty": 3
+    },
+    {
+     "name": "Feather Shuttlecock",
+     "price": 5.99,
+     "qty": 2
+    },
+    {
+     "name": "Nike Baseball Cleats",
+     "price": 79.99,
+     "qty": 3
+    }
+   ]
+  },
+  {
+   "total": 12939.94,
+   "items": [
+    {
+     "name": "Asus Zenbook Pro Dual Screen Laptop",
+     "price": 1799.99,
+     "qty": 1
+    },
+    {
+     "name": "Gray Dress",
+     "price": 34.99,
+     "qty": 4
+    },
+    {
+     "name": "Rolex Datejust Women",
+     "price": 10999.99,
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "total": 307.92,
+   "items": [
+    {
+     "name": "Apple",
+     "price": 1.99,
+     "qty": 4
+    },
+    {
+     "name": "Sports Sneakers Off White Red",
+     "price": 109.99,
+     "qty": 2
+    },
+    {
+     "name": "Tartan Dress",
+     "price": 39.99,
+     "qty": 2
+    }
+   ]
+  },
+  {
+   "total": 2499.91,
+   "items": [
+    {
+     "name": "Oppo K1",
+     "price": 299.99,
+     "qty": 5
+    },
+    {
+     "name": "Vivo S1",
+     "price": 249.99,
+     "qty": 4
+    }
+   ]
+  },
+  {
+   "total": 30299.94,
+   "items": [
+    {
+     "name": "Sportbike Motorcycle",
+     "price": 7499.99,
+     "qty": 4
+    },
+    {
+     "name": "Realme C35",
+     "price": 149.99,
+     "qty": 2
+    }
+   ]
+  },
+  {
+   "total": 1228.35,
+   "items": [
+    {
+     "name": "Milk",
+     "price": 3.49,
+     "qty": 2
+    },
+    {
+     "name": "Apple Watch Series 4 Gold",
+     "price": 349.99,
+     "qty": 3
+    },
+    {
+     "name": "Potatoes",
+     "price": 2.29,
+     "qty": 5
+    },
+    {
+     "name": "Selfie Lamp with iPhone",
+     "price": 14.99,
+     "qty": 4
+    },
+    {
+     "name": "Apple HomePod Mini Cosmic Grey",
+     "price": 99.99,
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "total": 1111.84,
+   "items": [
+    {
+     "name": "iPhone 6",
+     "price": 299.99,
+     "qty": 3
+    },
+    {
+     "name": "Kitchen Sieve",
+     "price": 7.99,
+     "qty": 4
+    },
+    {
+     "name": "iPhone 12 Silicone Case with MagSafe Plum",
+     "price": 29.99,
+     "qty": 4
+    },
+    {
+     "name": "Volleyball",
+     "price": 11.99,
+     "qty": 5
+    }
+   ]
+  },
+  {
+   "total": 111014.85,
+   "items": [
+    {
+     "name": "Rolex Datejust Women",
+     "price": 10999.99,
+     "qty": 4
+    },
+    {
+     "name": "Rolex Datejust",
+     "price": 10999.99,
+     "qty": 5
+    },
+    {
+     "name": "Cooking Oil",
+     "price": 4.99,
+     "qty": 3
+    },
+    {
+     "name": "Generic Motorcycle",
+     "price": 3999.99,
+     "qty": 3
+    }
+   ]
+  },
+  {
+   "total": 5944.77,
+   "items": [
+    {
+     "name": "Green Crystal Earring",
+     "price": 29.99,
+     "qty": 5
+    },
+    {
+     "name": "Knife",
+     "price": 14.99,
+     "qty": 2
+    },
+    {
+     "name": "Plant Pot",
+     "price": 14.99,
+     "qty": 3
+    },
+    {
+     "name": "Black & Brown Slipper",
+     "price": 19.99,
+     "qty": 5
+    },
+    {
+     "name": "White Faux Leather Backpack",
+     "price": 39.99,
+     "qty": 3
+    },
+    {
+     "name": "Lenovo Yoga 920",
+     "price": 1099.99,
+     "qty": 5
+    }
+   ]
+  },
+  {
+   "total": 2359.84,
+   "items": [
+    {
+     "name": "Prada Women Bag",
+     "price": 599.99,
+     "qty": 3
+    },
+    {
+     "name": "Apple Airpower Wireless Charger",
+     "price": 79.99,
+     "qty": 5
+    },
+    {
+     "name": "Bamboo Spatula",
+     "price": 7.99,
+     "qty": 5
+    },
+    {
+     "name": "Basketball Rim",
+     "price": 39.99,
+     "qty": 3
+    }
+   ]
+  },
+  {
+   "total": 186110.85,
+   "items": [
+    {
+     "name": "Cricket Bat",
+     "price": 29.99,
+     "qty": 1
+    },
+    {
+     "name": "Vivo V9",
+     "price": 299.99,
+     "qty": 2
+    },
+    {
+     "name": "Oppo F19 Pro Plus",
+     "price": 399.99,
+     "qty": 1
+    },
+    {
+     "name": "Yellow Peeler",
+     "price": 5.99,
+     "qty": 1
+    },
+    {
+     "name": "Powder Canister",
+     "price": 14.99,
+     "qty": 5
+    },
+    {
+     "name": "Durango SXT RWD",
+     "price": 36999.99,
+     "qty": 5
+    }
+   ]
+  }
+ ]
+}

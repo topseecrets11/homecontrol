@@ -92,6 +92,8 @@
     Promise.all([api('/api/ledger/summary'), api('/api/ledger/products'), api('/api/ledger/transactions?limit=50')])
       .then(function (r) {
         var sum = r[0], prods = r[1].products || [], txs = r[2].transactions || [];
+        if (window.BeastDemo && window.BeastDemo.wants(txs, prods)) { window.BeastDemo.apply(); return; }   // empty Ledger: show the demo
+        if (window.BeastDemo) window.BeastDemo.stop();
         var all = sum.ventures || {};
         var conv = 0, ltv = 0, n = 0;
         Object.keys(all).forEach(function (v) { if (all[v].monthSales) { conv += all[v].conversion; ltv += all[v].ltv; n++; } });
