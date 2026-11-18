@@ -319,7 +319,48 @@ def op_fg_job(req):
     return {k: v for k, v in j.items() if k != "pid"}
 
 
-OPS = {"fg_presets": op_fg_presets, "fg_run": op_fg_run, "fg_job": op_fg_job, "studio_open": op_studio_open, "init": op_init, "mount": op_mount, "umount": op_umount, "status": op_status, "run": op_run,
+VR_ENGINE = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "modules", "vectorrig", "engine.py")
+
+
+def op_vr(req):
+    """VectorRig steps on files inside Abyss: bg (Frame Grabber cut-out), trace, normalize, pad, validate."""
+    import tempfile
+    step, args = req.get("step"), dict(req.get("args") or {})
+    for k in ("in", "out"):
+        if k in args:
+            args[k] = _inside_abyss(args[k]) if os.path.exists(args[k]) or k == "in" else \
+                os.path.join(_inside_abyss(os.path.dirname(args[k])), os.path.basename(args[k]))
+    if step == "bg":
+        with tempfile.TemporaryDirectory(dir=os.path.dirname(args["out"]), prefix=".vr-") as td:
+            job = {"task": "cutout", "inputs": [{"id": 0, "path": args["in"]}], "outdir": td,
+                   "options": {"model": args.get("model", "general"), "trim": False}, "tag": "vr"}
+            jf = os.path.join(td, "job.json")
+            json.dump(job, open(jf, "w"))
+            r = subprocess.run([FG_PY, os.path.join(FG, "worker.py"), jf], cwd=FG, capture_output=True, text=True, timeout=300,
+                               env=dict(os.environ, OMP_NUM_THREADS="2"))
+            outs = [json.loads(l)["out"] for l in r.stdout.splitlines() if l.startswith("{") and '"out"' in l]
+            cut = next((o for o in outs if o.get("variant") == "cutout"), None)
+            if not cut:
+                errs = [json.loads(l).get("error") or json.loads(l).get("why") for l in r.stdout.splitlines()
+                        if l.startswith("{") and ('"error"' in l or '"skip"' in l)]
+                raise RuntimeError((errs and errs[0]) or "nothing found to cut out")
+            os.replace(os.path.join(td, cut["file"]), args["out"])
+        return {"out": os.path.basename(args["out"])}
+    if step not in ("trace", "normalize", "pad", "validate"):
+        raise ValueError("unknown VectorRig step")
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as tf:
+        json.dump(args, tf)
+    try:
+        r = subprocess.run([FG_PY, VR_ENGINE, step, tf.name], capture_output=True, text=True, timeout=120)
+    finally:
+        os.unlink(tf.name)
+    res = json.loads((r.stdout.strip().splitlines() or ["{}"])[-1] or "{}")
+    if not res.get("ok"):
+        raise RuntimeError(res.get("error") or r.stderr[-200:] or "engine failed")
+    return res
+
+
+OPS = {"vr": op_vr, "fg_presets": op_fg_presets, "fg_run": op_fg_run, "fg_job": op_fg_job, "studio_open": op_studio_open, "init": op_init, "mount": op_mount, "umount": op_umount, "status": op_status, "run": op_run,
        "wr_list": op_wr_list, "wr_run": op_wr_run}
 
 

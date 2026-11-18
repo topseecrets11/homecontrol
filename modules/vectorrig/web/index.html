@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VectorRig</title>
+<style>
+:root { --bg:#070707; --panel:#101010; --card:#141414; --line:#2a2a2a; --ink:#e4e4dc; --dim:#7d7d72; --acc:#ffd400; --bad:#ff6b6b; --ok:#34d399; }
+* { box-sizing:border-box; }
+html, body { margin:0; height:100%; background:var(--bg); color:var(--ink); font-family:'JetBrains Mono','DejaVu Sans Mono',monospace; font-size:12px; overflow:hidden; }
+button, input, select { font:inherit; font-size:12px; color:var(--ink); background:#0e0e0e; border:1px solid var(--line); border-radius:8px; padding:6px 9px; }
+button { cursor:pointer; } button:hover, button.on { border-color:var(--acc); color:var(--acc); } button:disabled { opacity:.4; cursor:default; }
+.hidden { display:none !important; }
+#app { display:grid; grid-template-columns:190px 1fr 300px; grid-template-rows:46px 1fr; height:100%; }
+#top { grid-column:1/-1; display:flex; align-items:center; gap:10px; padding:0 12px; border-bottom:1px solid var(--line); background:#0a0a0a; }
+#top .logo { color:var(--acc); letter-spacing:.3em; } #top .sp { flex:1; } #top .msg { color:var(--dim); }
+#steps { border-right:1px solid var(--line); padding:10px; display:flex; flex-direction:column; gap:6px; background:var(--panel); }
+.step { display:flex; gap:8px; align-items:flex-start; padding:8px; border-radius:10px; border:1px solid transparent; cursor:pointer; }
+.step b { width:22px; height:22px; border-radius:50%; border:1px solid var(--line); display:flex; align-items:center; justify-content:center; flex:none; font-size:11px; }
+.step.on { border-color:var(--acc); } .step.on b { background:var(--acc); color:#000; border-color:var(--acc); }
+.step span { display:block; } .step small { color:var(--dim); font-size:10px; }
+#stage { position:relative; overflow:hidden; background:#050505; background-image:linear-gradient(45deg,#0d0d0d 25%,transparent 25%),linear-gradient(-45deg,#0d0d0d 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#0d0d0d 75%),linear-gradient(-45deg,transparent 75%,#0d0d0d 75%); background-size:20px 20px; background-position:0 0,0 10px,10px -10px,-10px 0; }
+#cv { position:absolute; inset:0; width:100%; height:100%; cursor:crosshair; }
+#drop { position:absolute; inset:20px; border:2px dashed #333; border-radius:16px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; color:var(--dim); text-align:center; }
+#drop.hot { border-color:var(--acc); color:var(--acc); }
+#tools { position:absolute; left:10px; top:10px; display:flex; gap:6px; flex-wrap:wrap; z-index:2; }
+#side { border-left:1px solid var(--line); background:var(--panel); display:flex; flex-direction:column; min-height:0; }
+#opts { padding:10px; border-bottom:1px solid var(--line); display:flex; flex-direction:column; gap:8px; }
+#opts label { display:flex; justify-content:space-between; align-items:center; gap:8px; color:var(--dim); }
+#opts input[type=range] { width:120px; accent-color:var(--acc); }
+#opts h3 { margin:0; font-size:11px; letter-spacing:.2em; color:var(--acc); }
+#parts { flex:1; overflow:auto; padding:10px; display:flex; flex-direction:column; gap:8px; }
+.part { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:8px; cursor:pointer; }
+.part.on { border-color:var(--acc); }
+.part .row { display:flex; gap:8px; align-items:center; }
+.part img { width:54px; height:54px; object-fit:contain; background:#0a0a0a; border-radius:6px; }
+.part .nm { font-weight:600; } .part .st { font-size:10px; color:var(--dim); }
+.pips { display:flex; gap:3px; margin-top:4px; } .pips i { width:18px; height:4px; border-radius:2px; background:#2a2a2a; } .pips i.y { background:var(--acc); }
+#score { padding:10px; border-top:1px solid var(--line); font-size:11px; line-height:1.5; }
+#score .big { font-size:22px; color:var(--acc); }
+#gate { position:fixed; inset:0; background:var(--bg); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; z-index:20; text-align:center; padding:20px; }
+#gate h1 { color:var(--acc); letter-spacing:.4em; font-size:15px; margin:0; } #gate p { color:var(--dim); max-width:440px; line-height:1.5; margin:0; }
+#plist { display:flex; flex-direction:column; gap:6px; min-width:280px; }
+#toast { position:fixed; bottom:14px; left:50%; transform:translateX(-50%); color:var(--acc); z-index:30; }
+@media (max-width: 900px) { #app { grid-template-columns:1fr; grid-template-rows:46px auto 1fr auto; } #steps { flex-direction:row; overflow-x:auto; } #side { max-height:40vh; } }
+</style>
+</head>
+<body>
+<div id="gate"><h1>VECTORRIG</h1><p id="gmsg">Loading…</p><div id="plist"></div>
+  <div><input id="pname" placeholder="New project (e.g. Harry)"> <button id="pnew">Create</button></div></div>
+
+<div id="app" class="hidden">
+  <div id="top"><span class="logo">VECTORRIG</span><b id="ptitle"></b><span class="sp"></span><span class="msg" id="msg"></span><button id="b-projects">Projects</button></div>
+  <div id="steps"></div>
+  <div id="stage">
+    <div id="tools"></div>
+    <canvas id="cv"></canvas>
+    <div id="drop" class="hidden"><div style="font-size:28px;color:var(--acc)">⇪</div><div>Drop a sprite sheet or character picture here</div><button id="pick">Choose a file</button></div>
+  </div>
+  <div id="side"><div id="opts"></div><div id="parts"></div><div id="score"></div></div>
+</div>
+<div id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (i) { return document.getElementById(i); };
+  function el(t, c, x) { var e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; }
+  function toast(t) { $('toast').textContent = t; clearTimeout(toast.t); toast.t = setTimeout(function () { $('toast').textContent = ''; }, 2800); }
+  function api(u, o) {
+    o = o || {}; o.credentials = 'same-origin';
+    if (o.json !== undefined) { o.method = o.method || 'POST'; o.headers = { 'Content-Type': 'application/json' }; o.body = JSON.stringify(o.json); }
+    return fetch(u, o).then(function (r) { return r.json().then(function (j) { if (!j.ok) { var e = new Error(j.error || 'failed'); e.status = r.status; throw e; } return j.result || j; }); });
+  }
+
+  var STEPS = [
+    ['upload', 'Upload', 'Sprite sheet or picture'], ['select', 'Select regions', 'Crop out each part'],
+    ['bg', 'Remove BG', 'AI cut-out per part'], ['trace', 'Vector trace', 'Flat colours + outline'],
+    ['normalize', 'Normalise', 'Palette, stroke, joints'], ['export', 'Export', 'Check + download SVGs']
+  ];
+  var P = null, sheets = [], parts = [], cur = 'upload', sheetImg = null, sheetName = null, selPart = null;
+  var opt = { colours: 6, detail: 0.6, stroke: 3, palette: 'man', tolerance: 0.15, radius: 10, model: 'general' };
+  try { Object.assign(opt, JSON.parse(localStorage.getItem('vr-opt') || '{}')); } catch (e) {}
+  function saveOpt() { try { localStorage.setItem('vr-opt', JSON.stringify(opt)); } catch (e) {} }
+  function fileUrl(p) { return '/api/vectorrig/file?project=' + encodeURIComponent(P) + '&path=' + encodeURIComponent(p) + '&v=' + Date.now(); }
+
+  // ---------------- steps rail
+  function drawSteps() {
+    var box = $('steps'); box.textContent = '';
+    STEPS.forEach(function (s, i) {
+      var d = el('div', 'step' + (cur === s[0] ? ' on' : '')); d.appendChild(el('b', null, i + 1));
+      var t = el('div'); t.appendChild(el('span', null, s[1])); t.appendChild(el('small', null, s[2])); d.appendChild(t);
+      d.onclick = function () { go(s[0]); }; box.appendChild(d);
+    });
+  }
+  function go(s) { cur = s; drawSteps(); drawOpts(); draw(); }
+
+  // ---------------- options panel per step
+  function slider(label, key, min, max, step, fmt) {
+    var l = el('label', null, label); var v = el('span', null, fmt ? fmt(opt[key]) : opt[key]);
+    var r = el('input'); r.type = 'range'; r.min = min; r.max = max; r.step = step; r.value = opt[key];
+    r.oninput = function () { opt[key] = parseFloat(r.value); v.textContent = fmt ? fmt(opt[key]) : opt[key]; saveOpt(); };
+    l.appendChild(r); l.appendChild(v); return l;
+  }
+  function choice(label, key, vals) {
+    var l = el('label', null, label), s = el('select');
+    vals.forEach(function (v) { var o = el('option', null, v); o.value = v; s.appendChild(o); }); s.value = opt[key];
+    s.onchange = function () { opt[key] = s.value; saveOpt(); }; l.appendChild(s); return l;
+  }
+  function action(text, fn) { var b = el('button', null, text); b.onclick = fn; return b; }
+  function drawOpts() {
+    var o = $('opts'); o.textContent = '';
+    var h = el('h3', null, STEPS.filter(function (s) { return s[0] === cur; })[0][1].toUpperCase()); o.appendChild(h);
+    if (cur === 'upload') {
+      o.appendChild(el('div', null, 'Drop a sprite sheet or a character picture. It is stored encrypted inside Abyss.'));
+      o.appendChild(action('Choose a file…', function () { $('pick').click(); }));
+      if (sheets.length) { var s = choice('Sheet', 'sheet', sheets); s.querySelector('select').value = sheetName || sheets[0];
+        s.querySelector('select').onchange = function () { loadSheet(this.value); }; o.appendChild(s); }
+    } else if (cur === 'select') {
+      o.appendChild(el('div', null, 'Drag a box around a part on the sheet, then name it (head, torso, left-arm…).'));
+    } else if (cur === 'bg') {
+      o.appendChild(choice('AI model', 'model', ['general', 'people']));
+      o.appendChild(action('Remove background on selected', function () { run('bg', selPart); }));
+      o.appendChild(action('…on all parts', function () { runAll('bg'); }));
+    } else if (cur === 'trace') {
+      o.appendChild(slider('Colours', 'colours', 1, 16, 1));
+      o.appendChild(slider('Detail', 'detail', 0, 1, 0.05, function (v) { return Math.round(v * 100) + '%'; }));
+      o.appendChild(slider('Outline px', 'stroke', 0, 10, 0.5));
+      o.appendChild(action('Trace selected', function () { run('trace', selPart); }));
+      o.appendChild(action('Trace all parts', function () { runAll('trace'); }));
+    } else if (cur === 'normalize') {
+      o.appendChild(choice('Palette', 'palette', ['man', 'woman', 'none']));
+      o.appendChild(slider('Tolerance', 'tolerance', 0, 0.5, 0.01, function (v) { return Math.round(v * 100) + '%'; }));
+      o.appendChild(slider('Outline px', 'stroke', 0, 10, 0.5));
+      o.appendChild(action('Normalise selected', function () { run('normalize', selPart); }));
+      o.appendChild(action('Normalise all', function () { runAll('normalize'); }));
+      o.appendChild(el('div', null, 'Joints: click on the part to drop pivot points (right-click removes). Caps hide gaps when limbs rotate.'));
+      o.appendChild(slider('Joint cap radius', 'radius', 2, 40, 1));
+      o.appendChild(action('Apply joint caps', function () { saveJoints().then(function () { run('pad', selPart); }); }));
+    } else if (cur === 'export') {
+      o.appendChild(action('Check selected', function () { run('validate', selPart); }));
+      o.appendChild(action('Check all', function () { runAll('validate'); }));
+      o.appendChild(action('Download selected SVG', function () { download(selPart); }));
+      o.appendChild(action('Download all SVGs', function () { parts.forEach(function (p, i) { setTimeout(function () { download(p.name); }, i * 300); }); }));
+    }
+  }
+
+  // ---------------- canvas
+  var cv = $('cv'), ctx = cv.getContext('2d'), view = { s: 1, x: 0, y: 0 }, box = null, joints = [], partImg = null;
+  function fitTo(w, h) {
+    var r = $('stage').getBoundingClientRect(); cv.width = r.width * devicePixelRatio; cv.height = r.height * devicePixelRatio;
+    view.s = Math.min((r.width - 40) / w, (r.height - 40) / h, 4); view.x = (r.width - w * view.s) / 2; view.y = (r.height - h * view.s) / 2;
+  }
+  function draw() {
+    var r = $('stage').getBoundingClientRect(); cv.width = r.width * devicePixelRatio; cv.height = r.height * devicePixelRatio;
+    ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0); ctx.clearRect(0, 0, r.width, r.height);
+    var showSheet = cur === 'upload' || cur === 'select' || !selPart;
+    $('drop').classList.toggle('hidden', !(cur === 'upload' && !sheetImg));
+    var img = showSheet ? sheetImg : partImg;
+    $('tools').textContent = '';
+    if (!img) return;
+    fitTo(img.naturalWidth || img.width, img.naturalHeight || img.height);
+    ctx.drawImage(img, view.x, view.y, img.width * view.s, img.height * view.s);
+    if (showSheet && box) {
+      ctx.strokeStyle = '#ffd400'; ctx.lineWidth = 2; ctx.setLineDash([6, 4]);
+      ctx.strokeRect(view.x + box.x * view.s, view.y + box.y * view.s, box.w * view.s, box.h * view.s); ctx.setLineDash([]);
+      if (!box.drag && box.w > 4 && box.h > 4) {
+        var save = el('button', null, 'Save this region as a part…'); save.onclick = cropPart; $('tools').appendChild(save);
+        var clr = el('button', null, 'Clear'); clr.onclick = function () { box = null; draw(); }; $('tools').appendChild(clr);
+      }
+    }
+    if (!showSheet && cur === 'normalize') {
+      joints.forEach(function (j) {
+        var x = view.x + j.x * view.s, y = view.y + j.y * view.s;
+        ctx.beginPath(); ctx.arc(x, y, opt.radius * view.s, 0, 6.283); ctx.strokeStyle = 'rgba(255,212,0,.6)'; ctx.lineWidth = 1.5; ctx.stroke();
+        ctx.beginPath(); ctx.arc(x, y, 4, 0, 6.283); ctx.fillStyle = '#ffd400'; ctx.fill();
+        ctx.fillStyle = '#ffd400'; ctx.font = '11px JetBrains Mono, monospace'; ctx.fillText(j.name, x + 8, y - 8);
+      });
+    }
+    if (!showSheet) {
+      var lbl = el('span', null, selPart + ' · ' + ({ trace: 'traced', normalize: 'final', export: 'final', bg: 'cut-out' }[cur] || ''));
+      lbl.style.cssText = 'padding:6px 9px;color:var(--acc)'; $('tools').appendChild(lbl);
+    }
+  }
+  function toImg(e) { var r = cv.getBoundingClientRect(); return [(e.clientX - r.left - view.x) / view.s, (e.clientY - r.top - view.y) / view.s]; }
+  cv.addEventListener('pointerdown', function (e) {
+    if (cur === 'select' && sheetImg) { var p = toImg(e); box = { x0: p[0], y0: p[1], x: p[0], y: p[1], w: 0, h: 0, drag: true }; cv.setPointerCapture(e.pointerId); }
+    else if (cur === 'normalize' && selPart && partImg) {
+      var q = toImg(e);
+      if (e.button === 2) { joints = joints.filter(function (j) { return Math.hypot(j.x - q[0], j.y - q[1]) > 12 / view.s; }); }
+      else { var nm = prompt('Joint name (neck, shoulder, elbow, hip, knee…)', 'joint'); if (nm) joints.push({ x: Math.round(q[0]), y: Math.round(q[1]), name: nm }); }
+      draw();
+    }
+  });
+  cv.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  cv.addEventListener('pointermove', function (e) {
+    if (!box || !box.drag) return; var p = toImg(e), W = sheetImg.width, H = sheetImg.height;
+    var x0 = Math.max(0, Math.min(box.x0, p[0])), y0 = Math.max(0, Math.min(box.y0, p[1]));
+    box.x = Math.round(x0); box.y = Math.round(y0); box.w = Math.round(Math.min(W, Math.max(box.x0, p[0])) - x0); box.h = Math.round(Math.min(H, Math.max(box.y0, p[1])) - y0); draw();
+  });
+  cv.addEventListener('pointerup', function () { if (box) { box.drag = false; draw(); } });
+  window.addEventListener('resize', draw);
+
+  function cropPart() {
+    var name = (prompt('Name this part (head, torso, left-arm…)', 'part-' + (parts.length + 1)) || '').trim(); if (!name) return;
+    var c = document.createElement('canvas'); c.width = box.w; c.height = box.h;
+    c.getContext('2d').drawImage(sheetImg, box.x, box.y, box.w, box.h, 0, 0, box.w, box.h);
+    c.toBlob(function (blob) {
+      fetch('/api/vectorrig/upload?project=' + encodeURIComponent(P) + '&kind=part&name=' + encodeURIComponent(name),
+        { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'image/png' }, body: blob })
+        .then(function (r) { return r.json(); }).then(function (j) { if (!j.ok) return toast(j.error); box = null; toast('Saved part “' + name + '”'); refresh(name); });
+    }, 'image/png');
+  }
+
+  // ---------------- data
+  function refresh(select) {
+    return api('/api/vectorrig/project?name=' + encodeURIComponent(P)).then(function (j) {
+      sheets = j.sheets; parts = j.parts;
+      if (!sheetName && sheets.length) loadSheet(sheets[sheets.length - 1]);
+      if (select) selPart = select;
+      drawParts(); drawOpts(); loadPartView();
+    });
+  }
+  function loadSheet(n) { sheetName = n; var im = new Image(); im.onload = function () { sheetImg = im; draw(); }; im.src = fileUrl('sheets/' + n); }
+  function partFile(p) {
+    var want = { bg: ['cut.png', 'raw.png'], trace: ['traced.svg', 'cut.png', 'raw.png'], normalize: ['final.svg', 'traced.svg', 'cut.png', 'raw.png'],
+                 export: ['final.svg', 'traced.svg', 'cut.png', 'raw.png'] }[cur] || ['raw.png'];
+    for (var i = 0; i < want.length; i++) if (p.files.indexOf(want[i]) >= 0) return want[i];
+    return 'raw.png';
+  }
+  function loadPartView() {
+    var p = parts.filter(function (x) { return x.name === selPart; })[0];
+    if (!p) { partImg = null; draw(); return; }
+    joints = (p.meta && p.meta.joints) ? p.meta.joints.slice() : [];
+    var im = new Image(); im.onload = function () { partImg = im; draw(); }; im.src = fileUrl('parts/' + p.name + '/' + partFile(p));
+  }
+  function drawParts() {
+    var box2 = $('parts'); box2.textContent = '';
+    if (!parts.length) box2.appendChild(el('div', null, 'No parts yet. Step 2: drag boxes on the sheet.'));
+    parts.forEach(function (p) {
+      var d = el('div', 'part' + (p.name === selPart ? ' on' : '')), row = el('div', 'row');
+      var im = el('img'); im.src = fileUrl('parts/' + p.name + '/' + (p.files.indexOf('final.svg') >= 0 ? 'final.svg' : p.files.indexOf('traced.svg') >= 0 ? 'traced.svg' : p.files.indexOf('cut.png') >= 0 ? 'cut.png' : 'raw.png'));
+      var t = el('div'); t.appendChild(el('div', 'nm', p.name));
+      t.appendChild(el('div', 'st', (p.meta.joints || []).length + ' joints'));
+      var pips = el('div', 'pips'); ['raw.png', 'cut.png', 'traced.svg', 'final.svg'].forEach(function (f) { pips.appendChild(el('i', p.files.indexOf(f) >= 0 ? 'y' : '')); });
+      t.appendChild(pips); row.appendChild(im); row.appendChild(t);
+      var del = el('button', null, '✕'); del.title = 'Delete part'; del.style.marginLeft = 'auto';
+      del.onclick = function (e) { e.stopPropagation(); if (confirm('Delete part “' + p.name + '”?')) api('/api/vectorrig/delete', { json: { project: P, part: p.name } }).then(function () { if (selPart === p.name) selPart = null; refresh(); }); };
+      row.appendChild(del); d.appendChild(row);
+      d.onclick = function () { selPart = p.name; if (cur === 'upload' || cur === 'select') go('bg'); drawParts(); loadPartView(); };
+      box2.appendChild(d);
+    });
+  }
+  function saveJoints() { if (!selPart) return Promise.resolve(); return api('/api/vectorrig/meta', { json: { project: P, part: selPart, joints: joints } }); }
+  function run(step, part) {
+    if (!part) { toast('Pick a part on the right first'); return Promise.resolve(); }
+    $('msg').textContent = step + ' · ' + part + '…';
+    return api('/api/vectorrig/step', { json: { project: P, part: part, step: step, options: opt } }).then(function (r) {
+      $('msg').textContent = '';
+      if (step === 'validate') showScore(part, r);
+      else toast(part + ': ' + ({ bg: 'background removed', trace: r.paths + ' shapes, ' + (r.colours || []).length + ' colours', normalize: r.snapped + ' colours snapped to the ' + r.palette + ' palette', pad: r.joints + ' joint caps' }[step] || 'done'));
+      return refresh(part);
+    }).catch(function (e) { $('msg').textContent = ''; toast(part + ': ' + e.message); if (e.status === 423) gate(e.message); });
+  }
+  function runAll(step) { var ps = parts.map(function (p) { return p.name; }), i = 0; (function next() { if (i >= ps.length) return toast('All parts: ' + step + ' done'); run(step, ps[i++]).then(next); })(); }
+  function showScore(part, r) {
+    var s = $('score'); s.textContent = '';
+    var b = el('div'); b.appendChild(el('span', 'big', r.score)); b.appendChild(document.createTextNode(' / 100 · ' + part + (r.ok ? ' · ready' : ' · needs work')));
+    s.appendChild(b);
+    (r.issues || []).forEach(function (x) { var d = el('div', null, '✕ ' + x); d.style.color = 'var(--bad)'; s.appendChild(d); });
+    (r.warnings || []).forEach(function (x) { s.appendChild(el('div', null, '! ' + x)); });
+  }
+  function download(part) {
+    var p = parts.filter(function (x) { return x.name === part; })[0]; if (!p) return toast('Pick a part first');
+    var f = p.files.indexOf('final.svg') >= 0 ? 'final.svg' : p.files.indexOf('traced.svg') >= 0 ? 'traced.svg' : null;
+    if (!f) return toast(part + ': trace it first');
+    fetch(fileUrl('parts/' + part + '/' + f), { credentials: 'same-origin' }).then(function (r) { return r.blob(); }).then(function (b) {
+      var a = el('a'); a.href = URL.createObjectURL(b); a.download = P + '-' + part + '.svg'; a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+    });
+  }
+
+  // ---------------- upload sheet
+  var picker = el('input'); picker.type = 'file'; picker.accept = 'image/png,image/jpeg,image/webp';
+  picker.onchange = function () { if (picker.files[0]) uploadSheet(picker.files[0]); picker.value = ''; };
+  $('pick').onclick = function () { picker.click(); };
+  function uploadSheet(f) {
+    toast('Saving into Abyss…');
+    fetch('/api/vectorrig/upload?project=' + encodeURIComponent(P) + '&kind=sheet&name=' + encodeURIComponent(f.name.replace(/[^\w .\-]/g, '_')),
+      { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/octet-stream' }, body: f })
+      .then(function (r) { return r.json(); }).then(function (j) { if (!j.ok) return toast(j.error); sheetName = null; refresh().then(function () { loadSheet(j.sheet); go('select'); }); });
+  }
+  ['dragover', 'dragenter'].forEach(function (ev) { $('stage').addEventListener(ev, function (e) { e.preventDefault(); $('drop').classList.add('hot'); }); });
+  $('stage').addEventListener('dragleave', function () { $('drop').classList.remove('hot'); });
+  $('stage').addEventListener('drop', function (e) { e.preventDefault(); $('drop').classList.remove('hot'); if (e.dataTransfer.files[0]) uploadSheet(e.dataTransfer.files[0]); });
+
+  // ---------------- projects
+  function gate(m) {
+    $('gate').classList.remove('hidden'); $('app').classList.add('hidden'); $('gmsg').textContent = m || 'Loading…'; $('plist').textContent = '';
+    api('/api/vectorrig/projects').then(function (j) {
+      $('gmsg').textContent = j.projects.length ? 'Your VectorRig projects (encrypted in Abyss):' : 'No projects yet. Name your first character:';
+      j.projects.forEach(function (n) { var b = el('button', null, n); b.onclick = function () { open(n); }; $('plist').appendChild(b); });
+    }).catch(function (e) { $('gmsg').textContent = e.message; });
+  }
+  function open(n) {
+    P = n; sheets = []; parts = []; sheetImg = null; sheetName = null; selPart = null; partImg = null;
+    $('gate').classList.add('hidden'); $('app').classList.remove('hidden'); $('ptitle').textContent = n; $('score').textContent = '';
+    refresh().then(function () { go(sheets.length ? (parts.length ? 'bg' : 'select') : 'upload'); });
+  }
+  $('pnew').onclick = function () { var n = $('pname').value.trim(); if (n) open(n); };
+  $('b-projects').onclick = function () { gate(); };
+  drawSteps(); gate();
+})();
+</script>
+</body>
+</html>
