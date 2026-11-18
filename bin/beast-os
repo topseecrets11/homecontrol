@@ -84,6 +84,11 @@ def cmd_revoke(a):
     print("revoked", a.name)
 
 
+def cmd_restart(a):
+    open(os.path.join(kernel.HOME, "restart"), "w").close()
+    print("Beast OS restarting (a couple of seconds)")
+
+
 def cmd_serve(a):
     kernel.serve(a.host, a.port)
 
@@ -94,6 +99,7 @@ s = sp.add_parser("serve"); s.add_argument("--port", type=int); s.add_argument("
 s = sp.add_parser("pair"); s.add_argument("--role", default="owner", choices=["owner", "tablet", "guest"]); s.add_argument("--name"); s.add_argument("--port", type=int); s.set_defaults(fn=cmd_pair)
 s = sp.add_parser("devices"); s.set_defaults(fn=cmd_devices)
 s = sp.add_parser("revoke"); s.add_argument("name"); s.set_defaults(fn=cmd_revoke)
+s = sp.add_parser("restart"); s.set_defaults(fn=cmd_restart)
 s = sp.add_parser("init"); s.add_argument("--from-hub", default="~/beast-hub/config.json"); s.set_defaults(fn=cmd_init)
 args = p.parse_args()
 args.fn(args)

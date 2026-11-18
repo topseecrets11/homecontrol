@@ -1,6 +1,6 @@
 #!/data/data/com.termux/files/usr/bin/sh
 # Beast OS: tablet setup. Run inside Termux on the tablet:
-#   sh setup.sh
+#   sh setup.sh CODE        (CODE from `beast-os pair --role tablet --name Tablet` on Beast)
 # - replaces the old plain-text socat forward with an SSH tunnel (encrypted, key-only)
 #   tablet localhost:8123  ->  Beast OS on Beast (127.0.0.1:8090)
 # - starts it on boot (needs the Termux:Boot app) and keeps it alive (autossh)
@@ -8,6 +8,8 @@
 set -e
 BEAST=192.168.1.106
 PORT=8090
+CODE="${1:-}"
+[ -n "$CODE" ] || { echo "usage: sh setup.sh CODE   (run  beast-os pair --role tablet  on Beast)"; exit 1; }
 
 pkg install -y openssh autossh curl >/dev/null
 mkdir -p ~/.ssh ~/.termux/boot ~/bin
@@ -79,8 +81,14 @@ chmod +x ~/bin/cc ~/bin/p ~/bin/beast-pair
 grep -q 'HOME/bin' ~/.profile 2>/dev/null || echo 'export PATH="$HOME/bin:$PATH"' >> ~/.profile
 pkg install -y python >/dev/null 2>&1 || true
 
-echo
-echo "== Add this key on Beast (Beast OS will do it for you if you paste it in the chat):"
-cat ~/.ssh/beast_tablet.pub
-echo
-echo "Then: sh ~/.termux/boot/beast-tunnel   (and it starts itself on boot)"
+# pair with Beast OS over the LAN, then hand Beast this tablet's SSH key
+R=$(curl -s -H 'Content-Type: application/json' -d "{\"code\":\"$CODE\",\"name\":\"Tablet Termux\"}" http://$BEAST:$PORT/api/pair)
+T=$(printf '%s' "$R" | sed -n 's/.*"token": *"\([^"]*\)".*/\1/p')
+[ -n "$T" ] || { echo "pairing failed: $R"; exit 1; }
+umask 077; printf '%s' "$T" > ~/.beast-os-token
+K=$(cat ~/.ssh/beast_tablet.pub)
+curl -s -H "Authorization: Bearer $T" -H 'Content-Type: application/json' -d "{\"pubkey\":\"$K\"}" http://$BEAST:$PORT/api/tablet/sshkey; echo
+ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes beast true && echo "ssh to Beast: OK"
+sh ~/.termux/boot/beast-tunnel && sleep 3
+curl -s -o /dev/null -w "tunnel: %{http_code}\n" http://127.0.0.1:8123/pair
+echo "BEAST OS TABLET READY"

@@ -1,0 +1,6 @@
+{
+  "id": "tablet",
+  "title": "Tablet",
+  "role": "tablet",
+  "modes": ["vault", "normal"]
+}

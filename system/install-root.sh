@@ -7,12 +7,16 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 step() { printf '\n== %s\n' "$*"; }
 
 [ "$(id -u)" = 0 ] || { echo "run with sudo"; exit 1; }
+LOG=/tmp/beast-os-install.log
+exec > >(tee "$LOG") 2>&1
+trap 'echo; echo "!! stopped at line $LINENO (see $LOG)"' ERR
 
 step "1/6 packages"
 apt-get install -y gocryptfs openssh-server autossh kdeconnect tmux
 
 step "2/6 SSH: keys only, $U only (no keys yet = nobody can log in)"
 install -m 644 "$HERE/sshd-beast-os.conf" /etc/ssh/sshd_config.d/10-beast-os.conf
+mkdir -p /run/sshd && chmod 755 /run/sshd      # sshd -t needs it; Mint only makes it when ssh first starts
 sshd -t
 systemctl enable --now ssh
 
@@ -36,5 +40,6 @@ step "5/6 one-way check (expect BLOCKED)"
 if systemd-run -P -q --wait -p User=$U -p IPAddressDeny=any -p IPAddressAllow=localhost \
      curl -s -m 5 -o /dev/null https://example.com; then echo "internet: OPEN (unexpected)"; else echo "internet: BLOCKED"; fi
 
+chmod 644 "$LOG"
 step "6/6 done"
 echo "Beast OS: http://127.0.0.1:8090   Pair devices with: ~/homecontrol/bin/beast-os pair"

@@ -58,8 +58,13 @@ def op_mount(req):
     for f in FOLDERS:
         c, p = cipher(f), plain(f)
         if not os.path.exists(os.path.join(c, "gocryptfs.conf")):
-            out[f] = "not set up"
-            continue
+            # set up on first unlock (e.g. the pattern was made before gocryptfs was installed)
+            os.makedirs(c, mode=0o700, exist_ok=True)
+            r = subprocess.run(["gocryptfs", "-init", "-q", c], input=req["password"] + "\n",
+                               capture_output=True, text=True, timeout=120)
+            if r.returncode:
+                out[f] = "error: " + r.stderr.strip()[-200:]
+                continue
         os.makedirs(p, mode=0o700, exist_ok=True)
         if mounted(p):
             out[f] = "mounted"

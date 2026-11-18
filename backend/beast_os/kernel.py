@@ -133,10 +133,18 @@ class Kernel:
         # pick up config/secret changes (e.g. a new HA token) without a restart
         self._cfg_mtime = self._cfg_stamp()
         every(10, self._watch_config)
+        every(2, self._watch_restart)
 
     def _cfg_stamp(self):
         return tuple(os.path.getmtime(os.path.join(HOME, n)) if os.path.exists(os.path.join(HOME, n)) else 0
                      for n in ("beast.json", "secrets.json"))
+
+    def _watch_restart(self):
+        f = os.path.join(HOME, "restart")
+        if os.path.exists(f):
+            os.unlink(f)
+            log("restart requested")
+            os._exit(0)            # systemd (Restart=always) starts us again with fresh code
 
     def _watch_config(self):
         st = self._cfg_stamp()
