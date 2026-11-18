@@ -30,6 +30,10 @@
   #top { flex: none; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
   .tag { font-size: 11px; letter-spacing: .18em; color: var(--dim); }
   .tag b { color: var(--accent); font-weight: 600; }
+  #layers { display: flex; gap: 6px; pointer-events: auto; }
+  #layers button { font: inherit; font-size: 12px; letter-spacing: .12em; color: var(--dim); background: rgba(255,255,255,.04);
+    border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; cursor: pointer; }
+  #layers button.on { color: var(--accent); border-color: var(--accent); background: rgba(50,205,50,.1); }
   #state { font-size: 12px; letter-spacing: .2em; color: var(--accent); text-transform: uppercase; white-space: nowrap; }
   #mid { flex: 1 1 auto; min-height: 0; display: flex; align-items: flex-end; gap: 12px; }
   #blobcol { flex: none; display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: auto; }
@@ -79,6 +83,7 @@
 <div id="ui">
   <div id="top">
     <div class="tag"><b>BEAST OS</b> · <span id="tagname">SECOND BRAIN · sample graph, not wired yet</span></div>
+    <div id="layers"><button data-l="virgil">VIRGIL</button><button data-l="me">ME</button><button data-l="both" class="on">BOTH</button></div>
     <div id="state">idle</div>
   </div>
   <div id="mid">
@@ -179,6 +184,15 @@ function beastVisuals(REAL) {
   ['Pictures', 'Music', 'Videos', 'Documents', 'Desktop'].forEach(function (f) { add(f + ' · Abyss', 'abyss', 1.2, 'vault'); link('Abyss', f + ' · Abyss'); });
   add('Blender (Abyss)', 'abyss', 1.1, 'app'); link('Blender (Abyss)', 'Videos · Abyss'); link('Blender (Abyss)', 'Desktop · Abyss');
   link('Frame Grabber', 'Pictures · Abyss'); link('You-BEAST', 'Music · Abyss');
+  // Two minds: Virgil's (him, his modules, the machines he runs) and mine (projects, ventures, vault, mood).
+  var VIRGIL_CL = { core: 1, mod: 1, mach: 1 };
+  var layerMode = 'both';
+  function setLayer(mode) {
+    layerMode = mode;
+    nodes.forEach(function (n) { n.layer = VIRGIL_CL[n.cl] ? 'virgil' : 'me'; n.off = mode !== 'both' && n.layer !== mode && n.i !== 0; });
+    Array.prototype.forEach.call(document.querySelectorAll('#layers button'), function (b) { b.classList.toggle('on', b.getAttribute('data-l') === mode); });
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('#layers button'), function (b) { b.onclick = function () { setLayer(b.getAttribute('data-l')); }; });
   var prevMood = null;
   var seed = 7;
   function rnd() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
@@ -188,6 +202,7 @@ function beastVisuals(REAL) {
     link(id, prevMood === null ? 'Mood' : prevMood); prevMood = id;
   });
   if (prevMood !== null) link(prevMood, 'Mood');
+  setLayer('both');
   var N = nodes.length, E = edges.length;
   var adj = nodes.map(function () { return []; });
   edges.forEach(function (e) { adj[e.a].push(e.b); adj[e.b].push(e.a); });
@@ -577,7 +592,8 @@ function beastVisuals(REAL) {
           g += near * V.level * 0.9;
         }
         g += 0.08 * Math.sin(now / 900 + i * 1.7);   // living shimmer
-        push(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2], n.dim ? [n.rgb[0] * 0.35, n.rgb[1] * 0.35, n.rgb[2] * 0.35] : n.rgb, n.size, Math.max(0, g));
+        var shade = n.off ? 0.1 : (n.dim ? 0.35 : 1);
+        push(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2], shade === 1 ? n.rgb : [n.rgb[0] * shade, n.rgb[1] * shade, n.rgb[2] * shade], n.off ? n.size * 0.6 : n.size, n.off ? 0 : Math.max(0, g));
       }
       // pulses with short trails
       for (var p = 0; p < pulses.length; p++) {
@@ -703,7 +719,7 @@ function beastVisuals(REAL) {
         if (!i) return;
         var n = nodes[i], P = project(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2], tmp);
         var s = n.size * P[3] * 16 * (1 + n.glow * 0.8 + (n.src ? 0.6 : 0));
-        ctx.globalAlpha = Math.min(1, 0.55 + n.glow * 0.5);
+        ctx.globalAlpha = n.off ? 0.08 : Math.min(1, 0.55 + n.glow * 0.5);
         ctx.drawImage(sprites[n.cl], P[0] - s / 2, P[1] - s / 2, s, s);
       });
       pulses.forEach(function (pl) {
