@@ -60,12 +60,14 @@
   #hud input[type=range] { width: clamp(52px, 6vw, 90px); accent-color: var(--accent); }
   #b-mood { display: none; }
   .sep { width: 1px; height: 24px; background: var(--line); }
-  /* Short or narrow frames: the mood sliders fold behind a "Mood" button so the
-     controls bar stays one or two rows and never swallows the map. */
+  /* The ask / Hey Virge / desk-light row is retired from this page (Virgil's talk window is the VIRGIL bar at the
+     bottom of Beast OS). What's left is the mood check-in, which tucks itself away once you've checked in. */
+  #askgrp, .sep { display: none !important; }
+  #hud.hidden { display: none; }
+  #moodpill { display: none; position: fixed; right: 14px; bottom: 12px; pointer-events: auto; font: inherit; font-size: 12px; letter-spacing: .12em;
+    color: var(--dim); background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 8px 16px; cursor: pointer; backdrop-filter: blur(6px); }
+  #moodpill:hover { color: var(--accent); border-color: var(--accent); }
   @media (max-height: 640px), (max-width: 900px) {
-    #b-mood { display: inline-block; }
-    #moodgrp, .sep { display: none; }
-    #hud.open #moodgrp { display: flex; flex: 1 1 100%; }
     #info { flex-basis: 220px; }
     .tag { font-size: 10px; letter-spacing: .12em; }
   }
@@ -80,6 +82,7 @@
 </head>
 <body>
 <canvas id="brain"></canvas>
+<button id="moodpill" type="button">◐ MOOD CHECK-IN</button>
 <div id="ui">
   <div id="top">
     <div class="tag"><b>BEAST OS</b> · <span id="tagname">SECOND BRAIN · sample graph, not wired yet</span></div>
@@ -819,7 +822,8 @@ function beastVisuals(REAL) {
   }
   window.addEventListener('resize', resize); resize();
   if (window.ResizeObserver) new ResizeObserver(resize).observe($('blobwrap'));   // blob re-sizes when the layout reflows
-  $('b-mood').onclick = function () { $('hud').classList.toggle('open'); };
+  function showHud(on) { $('hud').classList.toggle('hidden', !on); $('moodpill').style.display = on ? 'none' : 'block'; }
+  $('moodpill').onclick = function () { showHud(true); };
 
   var drawBrain = null, drawBlob = null;
   if (!LITE) {
@@ -907,6 +911,7 @@ function beastVisuals(REAL) {
     $(pair[0]).addEventListener('input', function () { mood[pair[1]] = parseFloat(this.value); lastInteract = performance.now(); });
   });
   $('b-check').onclick = function () {
+    setTimeout(function () { showHud(false); }, 1800);       // let the blob react, then tuck the controls away
     ripple = 1; lastInteract = performance.now();
     var mid = byName['Mood']; nodes[mid].glow = 2;
     firePulse(mid, 0, 0, moodHue(mood.temper));
