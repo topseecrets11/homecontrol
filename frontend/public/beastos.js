@@ -11,6 +11,7 @@
   var pushTimer = null;
   var lastCheckIn = null;
   var me = null;
+  var bootAt = Date.now();
 
   function api(path, opts) {
     opts = opts || {};
@@ -45,8 +46,10 @@
   }
 
   function onState(next) {
-    if (next.wellbeing && next.wellbeing.lastCheckIn && next.wellbeing.lastCheckIn !== lastCheckIn) {
-      lastCheckIn = next.wellbeing.lastCheckIn;
+    // Only a submitted check-in is a mood reading; "Skip for now" isn't logged.
+    var w = next.wellbeing;
+    if (w && w.lastCheckIn && w.lastCheckIn !== lastCheckIn && !w.skipped && Date.now() - bootAt > 1500) {
+      lastCheckIn = w.lastCheckIn;
       api('/api/mood/checkin', { method: 'POST', body: {
         recovery: next.wellbeing.recovery, vitality: next.wellbeing.vitality, temper: next.wellbeing.temper
       } }).catch(function () {});

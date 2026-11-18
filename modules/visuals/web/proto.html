@@ -20,61 +20,86 @@
     font-family: 'JetBrains Mono', 'DejaVu Sans Mono', monospace; overflow: hidden; }
   body { background: radial-gradient(ellipse at 50% 45%, var(--mood-a) 0%, var(--mood-b) 70%); transition: background 1.2s; }
   #brain { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
-  .tag { position: fixed; top: 12px; left: 16px; font-size: 11px; letter-spacing: .18em; color: var(--dim); pointer-events: none; }
+  /* ---- overlay layout --------------------------------------------------
+     One flowing column (top bar / middle row / controls bar) on top of the
+     full-bleed canvas, instead of pieces pinned at fixed pixel offsets. The
+     pieces can no longer sit on top of each other, whatever size the frame is
+     (desktop, half-width window, the 7" tablet). */
+  #ui { position: fixed; inset: 0; display: flex; flex-direction: column; gap: 8px; padding: 10px 12px;
+    pointer-events: none; min-height: 0; }
+  #top { flex: none; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .tag { font-size: 11px; letter-spacing: .18em; color: var(--dim); }
   .tag b { color: var(--accent); font-weight: 600; }
-  #state { position: fixed; top: 12px; right: 16px; font-size: 12px; letter-spacing: .2em; color: var(--accent); pointer-events: none; text-transform: uppercase; }
-  #blobwrap { position: fixed; left: 16px; bottom: 140px; width: 240px; height: 240px; }
+  #state { font-size: 12px; letter-spacing: .2em; color: var(--accent); text-transform: uppercase; white-space: nowrap; }
+  #mid { flex: 1 1 auto; min-height: 0; display: flex; align-items: flex-end; gap: 12px; }
+  #blobcol { flex: none; display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: auto; }
+  #blobwrap { position: relative; width: clamp(88px, min(26vh, 22vw), 240px); aspect-ratio: 1; }
   #blob, #sat { position: absolute; inset: 0; width: 100%; height: 100%; }
   #sat { pointer-events: none; }
-  #blobwrap .lbl { position: absolute; left: 0; right: 0; bottom: -18px; text-align: center; font-size: 10px; letter-spacing: .2em; color: var(--dim); }
-  #info { position: fixed; right: 16px; top: 44px; width: min(300px, calc(100vw - 32px)); padding: 12px 14px; border: 1px solid var(--line);
-    border-radius: 12px; background: var(--panel); font-size: 12px; line-height: 1.5; display: none; backdrop-filter: blur(6px); }
+  .lbl { font-size: 10px; letter-spacing: .2em; color: var(--dim); }
+  #reply { flex: 1 1 auto; min-width: 0; align-self: flex-end; text-align: center; font-size: 13px; line-height: 1.5; color: var(--ink);
+    text-shadow: 0 0 12px rgba(0,0,0,.9); min-height: 1.5em; padding: 0 4px 4px; }
+  #info { flex: 0 1 300px; min-width: 0; align-self: flex-start; margin-left: auto; max-height: 100%; overflow: auto; padding: 12px 14px;
+    border: 1px solid var(--line); border-radius: 12px; background: var(--panel); font-size: 12px; line-height: 1.5; display: none;
+    backdrop-filter: blur(6px); pointer-events: auto; }
   #info h3 { margin: 0 0 4px; font-size: 13px; color: var(--accent); letter-spacing: .08em; }
   #info .k { color: var(--dim); }
-  #reply { position: fixed; left: 50%; transform: translateX(-50%); bottom: 112px; max-width: min(560px, calc(100vw - 32px));
-    font-size: 13px; line-height: 1.5; text-align: center; color: var(--ink); text-shadow: 0 0 12px rgba(0,0,0,.9); pointer-events: none; min-height: 1.5em; }
-  #hud { position: fixed; left: 16px; right: 16px; bottom: 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  #hud { flex: none; pointer-events: auto; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
     padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); backdrop-filter: blur(6px); }
   #hud button, #hud input[type=text] { font: inherit; font-size: 12px; color: var(--ink); background: rgba(255,255,255,.04);
     border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; cursor: pointer; }
   #hud button:hover { border-color: var(--accent); color: var(--accent); }
-  #hud input[type=text] { flex: 1 1 180px; min-width: 120px; cursor: text; }
-  #hud .grp { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  #hud input[type=text] { flex: 1 1 160px; min-width: 100px; cursor: text; }
+  #hud .grp { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; min-width: 0; }
+  #hud #askgrp { flex: 1 1 320px; }
   #hud label { font-size: 10px; letter-spacing: .12em; color: var(--dim); display: flex; align-items: center; gap: 4px; }
-  #hud input[type=range] { width: 74px; accent-color: var(--accent); }
+  #hud input[type=range] { width: clamp(52px, 6vw, 90px); accent-color: var(--accent); }
+  #b-mood { display: none; }
   .sep { width: 1px; height: 24px; background: var(--line); }
-  @media (max-width: 720px) {
-    #blobwrap { width: 150px; height: 150px; bottom: 210px; }
-    #reply { bottom: 210px; }
-    .sep { display: none; }
+  /* Short or narrow frames: the mood sliders fold behind a "Mood" button so the
+     controls bar stays one or two rows and never swallows the map. */
+  @media (max-height: 640px), (max-width: 900px) {
+    #b-mood { display: inline-block; }
+    #moodgrp, .sep { display: none; }
+    #hud.open #moodgrp { display: flex; flex: 1 1 100%; }
+    #info { flex-basis: 220px; }
+    .tag { font-size: 10px; letter-spacing: .12em; }
   }
+  @media (max-height: 440px) { .lbl { display: none; } #reply { font-size: 12px; } }
 </style>
 </head>
 <body>
 <canvas id="brain"></canvas>
-<div class="tag"><b>BEAST OS</b> · VISUALS PROTOTYPE · sample graph, not wired yet</div>
-<div id="state">idle</div>
-<div id="info"></div>
-<div id="reply"></div>
-<div id="blobwrap"><canvas id="blob"></canvas><canvas id="sat"></canvas><div class="lbl">MOOD</div></div>
-<div id="hud">
-  <div class="grp">
-    <button id="b-listen" title="Push to talk (uses your mic level)">◉ Hey Virge</button>
-    <input id="ask" type="text" placeholder="Ask Virgil… (prototype answer)" autocomplete="off">
-    <button id="b-act" title="Fire an action at Home Assistant">⚡ Desk light</button>
+<div id="ui">
+  <div id="top">
+    <div class="tag"><b>BEAST OS</b> · SECOND BRAIN · sample graph, not wired yet</div>
+    <div id="state">idle</div>
   </div>
-  <span class="sep"></span>
-  <div class="grp">
-    <label>MOOD <input id="m-temper" type="range" min="0" max="10" step="0.1" value="6"></label>
-    <label>VITALITY <input id="m-vital" type="range" min="0" max="10" step="0.1" value="5"></label>
-    <label>RECOVERY <input id="m-recov" type="range" min="0" max="10" step="0.1" value="7"></label>
-    <label>STREAK <input id="m-streak" type="range" min="0" max="30" step="1" value="9"></label>
-    <button id="b-check">✓ Check in</button>
+  <div id="mid">
+    <div id="blobcol"><div id="blobwrap"><canvas id="blob"></canvas><canvas id="sat"></canvas></div><div class="lbl">MOOD</div></div>
+    <div id="reply"></div>
+    <div id="info"></div>
+  </div>
+  <div id="hud">
+    <div class="grp" id="askgrp">
+      <button id="b-listen" title="Push to talk (uses your mic level)">◉ Hey Virge</button>
+      <input id="ask" type="text" placeholder="Ask Virgil… (prototype answer)" autocomplete="off">
+      <button id="b-act" title="Fire an action at Home Assistant">⚡ Desk light</button>
+      <button id="b-mood" type="button" title="Show the mood sliders">◐ Mood</button>
+    </div>
+    <span class="sep"></span>
+    <div class="grp" id="moodgrp">
+      <label>MOOD <input id="m-temper" type="range" min="0" max="10" step="0.1" value="6"></label>
+      <label>VITALITY <input id="m-vital" type="range" min="0" max="10" step="0.1" value="5"></label>
+      <label>RECOVERY <input id="m-recov" type="range" min="0" max="10" step="0.1" value="7"></label>
+      <label>STREAK <input id="m-streak" type="range" min="0" max="30" step="1" value="9"></label>
+      <button id="b-check">✓ Check in</button>
+    </div>
   </div>
 </div>
 
 <script>
-(function () {
+function beastVisuals(REAL) {
   'use strict';
 
   var LITE = /[?&]lite\b/.test(location.search);
@@ -97,7 +122,9 @@
   function moodHue(m) { return 0.70 + (0.22 - 0.70) * (m / 10); }
 
   // ------------------------------------------------------------------
-  // Sample graph (real names; structure stands in until Virgil is wired)
+  // The graph: Beast OS modules (live from the kernel), your projects, machines,
+  // ventures and real mood check-ins. Notes and tangent links arrive with
+  // Virgil's memory.
   // ------------------------------------------------------------------
   var CL = {
     core:  { hue: 0.48, anchor: [0, 0, 0] },
@@ -115,8 +142,19 @@
     edges.push({ a: a, b: b, t: type || 'link' });
   }
   add('VIRGIL', 'core', 3.2, 'assistant');
-  ['Overview', 'Arena', 'Ledger', 'Oracle', 'Sanctum', 'Node', 'War Room', 'Home Assistant', 'Jellyfin',
-   'Abyss', 'KDE Connect', 'Prompts', 'Mood'].forEach(function (m) { add(m, 'mod', 1.7, 'module'); link('VIRGIL', m); });
+  var live = {};
+  (REAL.modules || []).forEach(function (m) { live[m.title] = 1; });
+  var MODS = ['Arena', 'Ledger', 'Oracle', 'Sanctum', 'Node', 'Overview', 'Mood', 'Second Brain', 'Beast Controls',
+              'War Room', 'Home Assistant', 'Jellyfin', 'Abyss', 'KDE Connect', 'Prompts'];
+  (REAL.modules || []).forEach(function (m) { if (MODS.indexOf(m.title) < 0) MODS.push(m.title); });
+  var BUILT = { Arena: 1, Ledger: 1, Oracle: 1, Sanctum: 1, Node: 1, Overview: 1 };
+  MODS.forEach(function (m) {
+    var on = BUILT[m] || live[m] || !REAL.live;
+    var id = add(m, 'mod', on ? 1.7 : 1.0, on ? 'module · live' : 'module · coming');
+    if (!on) nodes[id].dim = 1;
+    link('VIRGIL', m);
+  });
+  link('Beast Controls', 'Overview'); link('Second Brain', 'VIRGIL'); link('Mood', 'Sanctum');
   ['Beast', 'the Event', 'Tablet', 'Phone'].forEach(function (m) { add(m, 'mach', 1.6, 'machine'); link('VIRGIL', m); });
   link('Beast', 'Overview'); link('the Event', 'Home Assistant'); link('the Event', 'Jellyfin');
   link('Tablet', 'Overview'); link('Phone', 'KDE Connect');
@@ -136,28 +174,14 @@
   add('Blender (Abyss)', 'abyss', 1.1, 'app'); link('Blender (Abyss)', 'Videos · Abyss'); link('Blender (Abyss)', 'Desktop · Abyss');
   link('Frame Grabber', 'Pictures · Abyss'); link('You-BEAST', 'Music · Abyss');
   var prevMood = null;
-  for (var d = 13; d >= 0; d--) {
-    var id = add('Check-in −' + d + 'd', 'mood', 0.75, 'check-in');
-    link(id, prevMood === null ? 'Mood' : prevMood); prevMood = id;
-  }
-  link(prevMood, 'Mood');
-  // notes under each project, with tangent links (stand-in for model2vec similarity)
-  var noteWords = ['idea', 'todo', 'fix', 'spec', 'sketch', 'voice note', 'snippet', 'question'];
   var seed = 7;
   function rnd() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
-  var projIds = nodes.filter(function (n) { return n.cl === 'proj'; }).map(function (n) { return n.i; });
-  var noteIds = [];
-  projIds.forEach(function (p) {
-    var k = 3 + Math.floor(rnd() * 5);
-    for (var j = 0; j < k; j++) {
-      var id = add(nodes[p].label + ' · ' + noteWords[Math.floor(rnd() * noteWords.length)], 'proj', 0.55, 'note');
-      nodes[id].parentProj = p; link(id, p); noteIds.push(id);
-    }
+  var realChecks = (REAL.mood && REAL.mood.checkins) || [];
+  realChecks.slice(-14).forEach(function (c) {
+    var id = add('Check-in ' + new Date(c.ts * 1000).toLocaleDateString() + ' · mood ' + c.temper, 'mood', 0.75, 'check-in');
+    link(id, prevMood === null ? 'Mood' : prevMood); prevMood = id;
   });
-  for (var t = 0; t < 46; t++) {
-    var a = noteIds[Math.floor(rnd() * noteIds.length)], b = noteIds[Math.floor(rnd() * noteIds.length)];
-    if (nodes[a].parentProj !== nodes[b].parentProj) link(a, b, 'tangent');
-  }
+  if (prevMood !== null) link(prevMood, 'Mood');
   var N = nodes.length, E = edges.length;
   var adj = nodes.map(function () { return []; });
   edges.forEach(function (e) { adj[e.a].push(e.b); adj[e.b].push(e.a); });
@@ -296,19 +320,27 @@
     return path;
   }
   var REPLIES = [
-    'Pulled what I know. Wired to Hermes soon, so this answer is a placeholder.',
+    'Sample mode: open this inside Beast OS for live answers.',
     'Found it across your projects and the Ledger. The real answer lands when Hermes is live.',
     'Here is what your second brain links to that. Prototype voice only for now.'
   ];
+  var pendingReply = null;
   function ask(text) {
     if (!text) return;
     lastInteract = performance.now();
     setState('thinking');
     $('reply').textContent = '';
     nodes.forEach(function (n) { n.src = 0; });
+    pendingReply = null;
+    var answered = REAL.live ? fetch('/api/action', { method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'hermes', text: text }) })
+      .then(function (r) { return r.json(); })
+      .then(function (j) { return j.ok ? j.reply : 'Hermes is not running yet. Ollama gets installed next.'; })
+      .catch(function () { return 'Hermes is not running yet. Ollama gets installed next.'; })
+      : Promise.resolve(REPLIES[Math.floor(Math.random() * REPLIES.length)]);
     var path = retrievalPath(text), step = 0;
     function next() {
-      if (step >= path.length - 1) { setTimeout(speak, 200); return; }
+      if (step >= path.length - 1) { answered.then(function (msg) { pendingReply = msg; speak(); }); return; }
       var a = path[step], b = path[step + 1]; step++;
       firePulse(a, b, 0, 0.48, function () { nodes[b].glow = 1.4; nodes[b].src = 1; next(); });
     }
@@ -316,7 +348,7 @@
   }
   function speak() {
     setState('speaking');
-    var msg = REPLIES[Math.floor(Math.random() * REPLIES.length)], i = 0;
+    var msg = pendingReply || REPLIES[0], i = 0;
     var typer = setInterval(function () {
       i += 2; $('reply').textContent = msg.slice(0, i);
       if (i >= msg.length) { clearInterval(typer); setTimeout(function () { setState('idle'); nodes.forEach(function (n) { n.src = 0; }); }, 1400); }
@@ -539,7 +571,7 @@
           g += near * V.level * 0.9;
         }
         g += 0.08 * Math.sin(now / 900 + i * 1.7);   // living shimmer
-        push(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2], n.rgb, n.size, Math.max(0, g));
+        push(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2], n.dim ? [n.rgb[0] * 0.35, n.rgb[1] * 0.35, n.rgb[2] * 0.35] : n.rgb, n.size, Math.max(0, g));
       }
       // pulses with short trails
       for (var p = 0; p < pulses.length; p++) {
@@ -713,9 +745,26 @@
   // Satellites: the last 30 check-ins orbiting the blob (2D overlay)
   // ------------------------------------------------------------------
   var history = [];
-  for (var hd = 29; hd >= 0; hd--) {
-    var m0 = 5 + 3 * Math.sin(hd / 4) + (rnd() - 0.5) * 2;
-    history.push({ day: hd, temper: Math.max(0, Math.min(10, m0)), note: hd === 0 ? 'today' : hd + ' days ago · sample' });
+  if (REAL.live) {
+    var byDay = {};
+    realChecks.forEach(function (c) { byDay[new Date(c.ts * 1000).toDateString()] = c; });
+    Object.keys(byDay).forEach(function (k) {
+      var c = byDay[k];
+      history.push({ temper: c.temper, note: new Date(c.ts * 1000).toLocaleString() + (c.words ? ' · ' + c.words : '') });
+    });
+    history = history.slice(-30);
+    var last = realChecks[realChecks.length - 1];
+    if (last) { mood.temper = last.temper; mood.vital = last.vitality; mood.recov = last.recovery; }
+    mood.streak = (REAL.mood && REAL.mood.streak) || 0;
+    $('m-temper').value = mood.temper; $('m-vital').value = mood.vital; $('m-recov').value = mood.recov;
+    $('m-streak').value = mood.streak; $('m-streak').disabled = true;
+    $('m-streak').title = 'Streak counts days in a row with a check-in';
+    document.querySelector('.tag').innerHTML = '<b>BEAST OS</b> · SECOND BRAIN · live modules &amp; check-ins';
+  } else {
+    for (var hd = 29; hd >= 0; hd--) {
+      var m0 = 5 + 3 * Math.sin(hd / 4) + (rnd() - 0.5) * 2;
+      history.push({ day: hd, temper: Math.max(0, Math.min(10, m0)), note: hd + ' days ago · sample' });
+    }
   }
   var satCanvas = $('sat'), satCtx = satCanvas.getContext('2d'), satHit = [];
   function drawSats(now) {
@@ -747,6 +796,8 @@
     satCanvas.width = satCanvas.height = Math.round(bw * DPR);
   }
   window.addEventListener('resize', resize); resize();
+  if (window.ResizeObserver) new ResizeObserver(resize).observe($('blobwrap'));   // blob re-sizes when the layout reflows
+  $('b-mood').onclick = function () { $('hud').classList.toggle('open'); };
 
   var drawBrain = null, drawBlob = null;
   if (!LITE) {
@@ -828,9 +879,14 @@
   });
   $('b-check').onclick = function () {
     ripple = 1; lastInteract = performance.now();
-    history.shift(); history.push({ day: 0, temper: mood.temper, note: 'just now' });
     var mid = byName['Mood']; nodes[mid].glow = 2;
     firePulse(mid, 0, 0, moodHue(mood.temper));
+    if (!REAL.live) { history.shift(); history.push({ temper: mood.temper, note: 'just now (sample)' }); return; }
+    fetch('/api/mood/checkin', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ recovery: mood.recov, vitality: mood.vital, temper: mood.temper }) })
+      .then(function (r) { return r.json(); })
+      .then(function (j) { $('reply').textContent = j.ok ? 'Checked in. Mood ' + mood.temper.toFixed(1) + '.' : (j.error || 'Check-in failed'); })
+      .catch(function () { $('reply').textContent = 'Beast OS did not answer.'; });
   };
 
   // ------------------------------------------------------------------
@@ -886,6 +942,32 @@
   if (demo === 'think') setTimeout(function () { ask('war room notes'); }, 300);
   if (demo === 'listen') setTimeout(listen, 300);
   if (demo === 'act') setTimeout(function () { act('Home Assistant'); }, 300);
+
+  // other devices' check-ins arrive live
+  if (window.EventSource && REAL.live) {
+    var es = new EventSource('/api/events');
+    es.onmessage = function (e) {
+      var m; try { m = JSON.parse(e.data); } catch (x) { return; }
+      if (m.topic === 'mood.checkin') {
+        var d = m.data;
+        history.shift(); history.push({ temper: d.temper, note: new Date(d.ts * 1000).toLocaleString() });
+        ripple = 1; lastInteract = performance.now();
+      }
+    };
+  }
+}
+
+// ---- boot: real data from the Beast OS kernel, sample fallback when opened standalone
+(function () {
+  function get(u) {
+    return fetch(u, { credentials: 'same-origin' }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); });
+  }
+  var done = false;
+  function go(real) { if (done) return; done = true; beastVisuals(real); }
+  setTimeout(function () { go({ live: false }); }, 2500);
+  Promise.all([get('/api/modules'), get('/api/mood/history?days=30')])
+    .then(function (r) { go({ live: true, modules: r[0].modules || [], mood: r[1] }); })
+    .catch(function () { go({ live: false }); });
 })();
 </script>
 </body>

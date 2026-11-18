@@ -1551,10 +1551,11 @@
       );
     }
 
-    function doSubmit() {
+    function doSubmit(skipped) {
       setState({ wellbeing: {
         lastCheckIn: new Date().toISOString(),
-        recovery: vals.recovery, vitality: vals.vitality, temper: vals.temper
+        recovery: vals.recovery, vitality: vals.vitality, temper: vals.temper,
+        skipped: skipped === true
       }});
       removeById('wellbeing-overlay');
       var s = getState();
@@ -1576,7 +1577,7 @@
           makeSlider('temper', 'TEMPER', 'Mood')
         ),
         h('button', { className: 'wb-submit-btn', textContent: 'SUBMIT CHECK-IN', 'data-testid': 'wb-submit-btn', onClick: doSubmit }),
-        h('button', { className: 'wb-dismiss', textContent: 'SKIP FOR NOW', 'data-testid': 'wb-dismiss-btn', onClick: doSubmit })
+        h('button', { className: 'wb-dismiss', textContent: 'SKIP FOR NOW', 'data-testid': 'wb-dismiss-btn', onClick: function() { doSubmit(true); } })
       )
     );
     document.getElementById('homeos-app').appendChild(overlay);
