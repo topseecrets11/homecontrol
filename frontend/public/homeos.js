@@ -90,7 +90,6 @@
     },
     config: {
       hetznerIp: '',
-      stripeKey: '',
       tuyaId: ''
     },
     sanctum: {
@@ -163,11 +162,42 @@
       if (!state.config) { state.config = deepCopy(DEFAULT_STATE.config); changed = true; }
       if (!state.sanctum) { state.sanctum = deepCopy(DEFAULT_STATE.sanctum); changed = true; }
       if (!state.oracle) { state.oracle = deepCopy(DEFAULT_STATE.oracle); changed = true; }
+      if (!state.resilience) { state.resilience = deepCopy(DEFAULT_STATE.resilience); changed = true; }
+      if (!state.wellbeing) { state.wellbeing = deepCopy(DEFAULT_STATE.wellbeing); changed = true; }
+      if (!state.lastActivity) { state.lastActivity = Date.now(); changed = true; }
+      if (!isHexColor(state.activeTheme)) { state.activeTheme = '#32CD32'; changed = true; }
+      if (state.config && 'stripeKey' in state.config) { delete state.config.stripeKey; changed = true; }
       if (changed) {
         _cache = state;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       }
     }
+  }
+
+  function isHexColor(v) {
+    return typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v);
+  }
+
+  // Import guard: only known sections, each with the right shape.
+  var IMPORT_SHAPE = {
+    activeModule: 'string', resilience: 'object', wellbeing: 'object', lastActivity: 'number',
+    activeTheme: 'string', arena: 'object', products: 'array', transactions: 'array',
+    environment: 'object', config: 'object', sanctum: 'object', oracle: 'object'
+  };
+  function sanitizeImport(obj) {
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return null;
+    var out = {};
+    var keys = Object.keys(IMPORT_SHAPE);
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i], want = IMPORT_SHAPE[k], v = obj[k];
+      if (v === undefined || v === null) continue;
+      var ok = want === 'array' ? Array.isArray(v) : (typeof v === want && !Array.isArray(v));
+      if (ok) out[k] = v;
+    }
+    if (out.activeModule && !MODULE_INFO[out.activeModule]) delete out.activeModule;
+    if (out.activeTheme && !isHexColor(out.activeTheme)) delete out.activeTheme;
+    if (out.config) delete out.config.stripeKey;
+    return Object.keys(out).length ? out : null;
   }
 
   function deepCopy(obj) {
@@ -195,9 +225,8 @@
         var val = attrs[key];
         if (key === 'className') element.className = val;
         else if (key === 'textContent') element.textContent = val;
-        else if (key === 'innerHTML') element.innerHTML = val;
-        else if (key.indexOf('on') === 0 && typeof val === 'function') {
-          element.addEventListener(key.slice(2).toLowerCase(), val);
+        else if (key.indexOf('on') === 0) {
+          if (typeof val === 'function') element.addEventListener(key.slice(2).toLowerCase(), val);
         }
         else if (key === 'style' && typeof val === 'object') {
           var sk = Object.keys(val);
@@ -239,6 +268,7 @@
   }
 
   function applyTheme(hex) {
+    if (!isHexColor(hex)) hex = '#32CD32';
     var root = document.documentElement;
     root.style.setProperty('--theme-accent', hex);
     root.style.setProperty('--theme-accent-dim', hexToDim(hex));
@@ -1689,7 +1719,7 @@
 
     // === CONNECTIONS SECTION ===
     function buildConnectionsSection() {
-      var config = state.config || { hetznerIp: '', stripeKey: '', tuyaId: '' };
+      var config = state.config || { hetznerIp: '', tuyaId: '' };
 
       function makeField(key, label, placeholder) {
         var input = h('input', {
@@ -1711,7 +1741,6 @@
 
       return h('div', { className: 'settings-connections', 'data-testid': 'settings-connections' },
         makeField('hetznerIp', 'HETZNER IP', '0.0.0.0'),
-        makeField('stripeKey', 'STRIPE KEY', 'sk_live_...'),
         makeField('tuyaId', 'TUYA ID', 'tuya_device_...')
       );
     }
@@ -1744,7 +1773,8 @@
         var reader = new FileReader();
         reader.onload = function(ev) {
           try {
-            var parsed = JSON.parse(ev.target.result);
+            var parsed = sanitizeImport(JSON.parse(ev.target.result));
+            if (!parsed) return;
             localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
             _cache = null;
             window.location.reload();

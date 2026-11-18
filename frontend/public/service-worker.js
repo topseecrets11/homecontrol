@@ -1,58 +1,39 @@
-var CACHE_NAME = 'homeos-v1';
-var URLS_TO_CACHE = [
-  '/',
-  '/homeos.css',
-  '/homeos.js',
-  '/icon.svg',
-  '/manifest.json'
-];
+// Beast OS service worker: network-first, offline fallback for the shell only.
+// Never caches /api/*, /abyss/* or anything that isn't a plain same-origin GET.
+var CACHE_NAME = 'beast-os-v2';
+var SHELL = ['/', '/homeos.css', '/homeos.js', '/icon.svg', '/manifest.json'];
 
 self.addEventListener('install', function(event) {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(function(cache) {
-      return cache.addAll(URLS_TO_CACHE);
-    })
-  );
+  event.waitUntil(caches.open(CACHE_NAME).then(function(c) { return c.addAll(SHELL); }));
   self.skipWaiting();
 });
 
 self.addEventListener('activate', function(event) {
   event.waitUntil(
     caches.keys().then(function(keys) {
-      return Promise.all(
-        keys.filter(function(key) { return key !== CACHE_NAME; })
-            .map(function(key) { return caches.delete(key); })
-      );
-    })
+      return Promise.all(keys.filter(function(k) { return k !== CACHE_NAME; })
+        .map(function(k) { return caches.delete(k); }));
+    }).then(function() { return self.clients.claim(); })
   );
-  self.clients.claim();
 });
 
+function cacheable(req) {
+  if (req.method !== 'GET') return false;
+  var url = new URL(req.url);
+  if (url.origin !== self.location.origin) return false;
+  return !/^\/(api|abyss|m)\//.test(url.pathname);
+}
+
 self.addEventListener('fetch', function(event) {
-  if (event.request.method !== 'GET') return;
+  var req = event.request;
+  if (!cacheable(req)) return;
   event.respondWith(
-    caches.match(event.request).then(function(cached) {
-      if (cached) {
-        // Return cache, update in background
-        event.waitUntil(
-          fetch(event.request).then(function(response) {
-            if (response && response.status === 200) {
-              caches.open(CACHE_NAME).then(function(cache) {
-                cache.put(event.request, response);
-              });
-            }
-          }).catch(function() {})
-        );
-        return cached;
+    fetch(req).then(function(res) {
+      if (res && res.status === 200 && res.type === 'basic') {
+        var copy = res.clone();
+        caches.open(CACHE_NAME).then(function(c) { c.put(req, copy); });
       }
-      return fetch(event.request).then(function(response) {
-        if (!response || response.status !== 200) return response;
-        var clone = response.clone();
-        caches.open(CACHE_NAME).then(function(cache) {
-          cache.put(event.request, clone);
-        });
-        return response;
-      });
-    })
+      return res;
+    }).catch(function() { return caches.match(req); })
   );
 });
