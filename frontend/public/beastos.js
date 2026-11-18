@@ -138,7 +138,10 @@
     }).catch(function () {});
   }
 
+  function blob(name) { if (window.BeastBlob) window.BeastBlob.react(name); }
+
   function deviceToggle(d) {
+    blob(d.state === 'on' ? 'lightOff' : 'lightOn');      // he clicks first, the light follows
     var domain = d.entity.split('.')[0];
     api('/api/action', { method: 'POST', body: { action: 'ha', domain: domain, service: 'toggle', data: { entity_id: d.entity } } })
       .catch(function () {});
@@ -146,10 +149,26 @@
 
   function listen() {
     var es = new EventSource('/api/events');
-    var lastHouse = 0;
+    var lastHouse = 0, lights = null;
     es.onmessage = function (e) {
       var m; try { m = JSON.parse(e.data); } catch (x) { return; }
-      if (m.topic === 'ledger.changed') loadLedger();
+      if (window.BeastModes) window.BeastModes.onEvent(m);
+      if (m.topic === 'beast.state') {
+        // a light or switch changing anywhere in the house -> the blob reacts
+        var ents = (m.data.ha && m.data.ha.entities) || {}, seen = {};
+        Object.keys(ents).forEach(function (id) {
+          if (!/^(light|switch)\./.test(id)) return;
+          seen[id] = ents[id].state;
+          if (lights && lights[id] && lights[id] !== ents[id].state) blob(ents[id].state === 'on' ? 'lightOn' : 'lightOff');
+        });
+        lights = seen;
+      }
+      if (m.topic === 'mood.checkin' && window.BeastBlob) {
+        window.BeastBlob.setMood(m.data);
+        blob(m.data.temper >= 6 ? 'cheer' : 'flinch');
+      }
+      if (m.topic === 'virgil.state') blob({ listening: 'listen', thinking: 'think', speaking: 'talk' }[m.data.state] || 'idle');
+      if (m.topic === 'ledger.changed') { loadLedger(); blob('cheer'); }
       else if (m.topic === 'beast.state' && Date.now() - lastHouse > 20000) { lastHouse = Date.now(); applyHouse(m.data); }
       else if (m.topic === 'homeos.state' && m.data && m.data.by !== me) pull(function () { window.HomeOS.refresh(); });
     };
@@ -160,8 +179,14 @@
   function start() {
     if (!window.HomeOS) return setTimeout(start, 50);
     api('/api/me').then(function (j) { me = j.name; }).catch(function () {});
+    if (window.BeastModes) window.BeastModes.start();
     loadModules();
     loadLedger();
+    var st0 = window.HomeOS.getState() || {};
+    if (window.BeastBlob) {
+      if (st0.wellbeing) window.BeastBlob.setMood(st0.wellbeing);
+      window.BeastBlob.schedule(st0.blob || { wake: '07:00', bed: '23:00' });
+    }
     api('/api/state').then(function (j) { if (j.state) applyHouse(j.state); }).catch(function () {});
     listen();
   }

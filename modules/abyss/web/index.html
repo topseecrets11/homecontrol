@@ -26,6 +26,12 @@
   #crumbs { flex:1 1 200px; font-size:12px; color:var(--dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   #crumbs a { color:var(--ink); cursor:pointer; } #crumbs a:hover { color:var(--acc); }
   #timer { font-size:11px; color:var(--void); letter-spacing:.1em; }
+  #workspace { display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; padding:10px 12px 2px; }
+  #workspace .wl { font-size:10px; letter-spacing:.25em; color:#ffd400; } #workspace .wd { font-size:10px; color:var(--dim); flex:1 1 200px; }
+  #apps { display:flex; gap:6px; flex-wrap:wrap; width:100%; }
+  #apps button { display:flex; align-items:center; gap:6px; border-color:rgba(255,212,0,.25); }
+  #apps button b { color:#ffd400; font-weight:400; }
+  #apps.off { opacity:.35; pointer-events:none; }
   #filters { display:flex; gap:6px; flex-wrap:wrap; padding:8px 12px; }
   #filters button.on { border-color:var(--void); color:#c7b8ff; }
   #items { flex:1; overflow:auto; padding:8px 12px 16px; display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:10px; align-content:start; }
@@ -69,10 +75,10 @@
     <select id="sort"><option value="name">Name</option><option value="new">Newest</option><option value="big">Biggest</option></select>
     <button id="b-up">⇪ Add</button>
     <button id="b-dir">+ Folder</button>
-    <button id="b-blender" title="Blender with no network, saving into this Abyss folder">◈ Blender</button>
     <span id="timer"></span>
     <button id="b-lock">Lock</button>
   </div>
+  <div id="workspace"><span class="wl">WORKSPACE</span><span class="wd">opens on Beast with no network · saves stay in this Abyss folder</span><div id="apps"></div></div>
   <div id="filters"></div>
   <div id="items"></div>
   <input id="file" type="file" multiple class="hidden">
@@ -212,7 +218,8 @@
       box.appendChild(it);
     });
     var inFolder = !!path;
-    ['b-up', 'b-dir', 'b-blender'].forEach(function (id) { $(id).disabled = !inFolder; $(id).style.opacity = inFolder ? 1 : .4; });
+    ['b-up', 'b-dir'].forEach(function (id) { $(id).disabled = !inFolder; $(id).style.opacity = inFolder ? 1 : .4; });
+    $('apps').className = inFolder ? '' : 'off';
   }
   $('q').oninput = render; $('sort').onchange = render;
 
@@ -243,11 +250,19 @@
     var n = (prompt('New folder name') || '').trim().replace(/[\/\\]/g, '');
     if (n) api('/api/abyss/mkdir', { json: { path: path + '/' + n } }).then(function () { go(path); }).catch(function (e) { alert(e.message); });
   };
-  $('b-blender').onclick = function () {
-    api('/api/abyss/run', { json: { app: 'blender', sub: path } })
-      .then(function (j) { alert('Blender is opening on Beast with no network. Saves go to Abyss/' + j.result.saves_to + ' (in Blender: ~/AbyssWork).'); })
-      .catch(function (e) { alert(e.message); });
-  };
+  var APPS = [['blender', '◈', 'Blender'], ['kdenlive', '▶', 'Kdenlive'], ['gimp', '◩', 'GIMP'], ['inkscape', '✎', 'Inkscape'],
+              ['audacity', '♪', 'Audacity'], ['libreoffice', '≣', 'LibreOffice'], ['vlc', '◭', 'VLC'], ['files', '▤', 'Files']];
+  APPS.forEach(function (a) {
+    var b = document.createElement('button'), i = document.createElement('b');
+    i.textContent = a[1]; b.appendChild(i); b.appendChild(document.createTextNode(a[2]));
+    b.title = a[2] + ' opens on Beast with no network; it works inside this Abyss folder (~/AbyssWork in the app)';
+    b.onclick = function () {
+      api('/api/abyss/run', { json: { app: a[0], sub: path } })
+        .then(function (j) { $('timer').textContent = a[2] + ' opening… saves → Abyss/' + j.result.saves_to; })
+        .catch(function (e) { alert(e.message); });
+    };
+    $('apps').appendChild(b);
+  });
   $('b-lock').onclick = function () { api('/api/abyss/lock', { json: {} }).then(locked); };
   document.addEventListener('dragover', function (e) { if ($('vault').classList.contains('hidden')) return; e.preventDefault(); $('drop').classList.remove('hidden'); });
   document.addEventListener('dragleave', function (e) { if (!e.relatedTarget) $('drop').classList.add('hidden'); });

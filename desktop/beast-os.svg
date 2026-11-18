@@ -1,1 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#0a0a0a"/><circle cx="32" cy="32" r="16" fill="none" stroke="#32cd32" stroke-width="4"/><circle cx="32" cy="32" r="6" fill="#32cd32"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="y" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe14d"/><stop offset="1" stop-color="#e6a800"/></linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="#0b0b0b"/>
+  <rect x="5" y="5" width="118" height="118" rx="24" fill="none" stroke="#ffd400" stroke-width="3"/>
+  <!-- goo mass melting onto the floor, with drips -->
+  <path d="M20 100 C24 96 28 90 30 80 C33 60 42 38 64 34 C86 38 95 60 98 80 C100 90 104 96 108 100 Z" fill="url(#y)"/>
+  <path d="M40 100 C40 106 46 108 46 102 L46 96 Z M76 100 C76 110 84 110 84 102 L84 94 Z" fill="url(#y)"/>
+  <rect x="16" y="99" width="96" height="5" rx="2.5" fill="#ffd400"/>
+  <!-- narrowed eyes: he's watching -->
+  <path d="M46 62 L62 66 L60 72 L47 69 Z" fill="#0b0b0b"/>
+  <path d="M82 62 L66 66 L68 72 L81 69 Z" fill="#0b0b0b"/>
+  <path d="M46 46 C50 41 56 39 62 38" stroke="#fff3b0" stroke-width="4" stroke-linecap="round" fill="none" opacity=".75"/>
+</svg>

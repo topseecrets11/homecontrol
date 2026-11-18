@@ -1,5 +1,9 @@
 {
   "id": "ledger",
   "title": "Ledger",
-  "role": "tablet"
+  "role": "tablet",
+  "modes": [
+    "vault",
+    "normal"
+  ]
 }

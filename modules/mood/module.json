@@ -1,6 +1,16 @@
 {
   "id": "mood",
   "title": "Mood",
-  "tab": {"label": "MOOD", "icon": "◐", "order": 40, "view": "frame", "src": "/m/visuals/proto.html?view=mood"},
-  "role": "tablet"
+  "tab": {
+    "label": "MOOD",
+    "icon": "\u25d0",
+    "order": 40,
+    "view": "frame",
+    "src": "/m/visuals/proto.html?view=mood"
+  },
+  "role": "tablet",
+  "modes": [
+    "vault",
+    "normal"
+  ]
 }

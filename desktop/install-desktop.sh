@@ -4,14 +4,15 @@ set -euo pipefail
 R="$(cd "$(dirname "$0")/.." && pwd)"
 A="$HOME/.local/share/applications"; I="$HOME/.local/share/icons/hicolor/scalable/apps"; N="$HOME/.local/share/nemo/actions"
 mkdir -p "$A" "$I" "$N" "$HOME/.config/systemd/user"
-cp "$R/desktop/beast-os-abyss.svg" "$I/beast-os-abyss.svg"; cp "$R/desktop/beast-os.svg" "$I/beast-os.svg"
+for f in beast-os beast-os-abyss blender-abyss; do cp "$R/desktop/$f.svg" "$I/$f.svg"; done
 cat > "$A/beast-os.desktop" <<D
 [Desktop Entry]
 Type=Application
 Name=Beast OS
 Comment=Your home system: Arena, Node, Sanctum, Oracle, Virgil, Abyss
-Exec=google-chrome --app=http://127.0.0.1:8090/ --user-data-dir=$HOME/.config/beast-os-chrome --window-size=1400,850
+Exec=$R/bin/beast-os-window
 Icon=beast-os
+StartupWMClass=127.0.0.1
 Categories=Utility;
 D
 cat > "$A/abyss.desktop" <<D
@@ -21,6 +22,7 @@ Name=Abyss
 Comment=Your encrypted vault (pattern lock)
 Exec=$R/bin/abyss open
 Icon=beast-os-abyss
+StartupWMClass=127.0.0.1__m_abyss
 Categories=Utility;Security;
 D
 cat > "$A/blender-abyss.desktop" <<D
@@ -29,7 +31,7 @@ Type=Application
 Name=Blender (Abyss)
 Comment=Blender with no network, saving into Abyss (Videos/Blender)
 Exec=$R/bin/abyss run blender Videos/Blender
-Icon=blender
+Icon=blender-abyss
 Categories=Graphics;3DGraphics;
 D
 cat > "$N/send-to-abyss.nemo_action" <<D

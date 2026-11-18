@@ -1,7 +1,17 @@
 {
   "id": "kdeconnect",
   "title": "KDE Connect",
-  "tab": {"label": "PHONE", "icon": "☏", "order": 25, "view": "frame", "src": "/m/kdeconnect/"},
+  "tab": {
+    "label": "PHONE",
+    "icon": "\u260f",
+    "order": 25,
+    "view": "frame",
+    "src": "/m/kdeconnect/"
+  },
   "role": "owner",
-  "web": "web"
+  "web": "web",
+  "modes": [
+    "vault",
+    "normal"
+  ]
 }

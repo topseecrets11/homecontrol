@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Controls</title>
+<style>
+:root{--bg:#0a0a0a;--card:#131313;--line:#2a2a2a;--ink:#d8e6d8;--dim:#7a857c;--acc:#ffd400;--bad:#ff6b6b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:'JetBrains Mono','DejaVu Sans Mono',monospace;padding:14px}
+h1{font-size:13px;letter-spacing:.3em;color:var(--acc);margin:0 0 4px}.sub{font-size:11px;color:var(--dim);margin:0 0 12px}
+#panels{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;align-items:start}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
+.panel h2{margin:0 0 10px;font-size:11px;letter-spacing:.2em;color:var(--dim)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:8px}
+.b{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-height:70px;padding:8px 4px;border-radius:10px;
+  border:1px solid var(--line);background:#0d0d0d;color:var(--ink);cursor:pointer;font:inherit;font-size:10px;line-height:1.2;text-align:center}
+.b .i{font-size:18px;color:var(--acc)}.b:hover{border-color:var(--acc)}.b.macro{border-color:rgba(255,212,0,.35)}
+.b.hit{background:rgba(255,212,0,.15)}#toast{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);font-size:12px;color:var(--acc)}
+</style></head><body>
+<h1>CONTROLS</h1><p class="sub">From War Room. Gold-edged buttons are groups (several steps).</p>
+<div id="panels"></div><div id="toast"></div>
+<script>
+(function(){
+  var box=document.getElementById('panels'),toast=document.getElementById('toast');
+  function say(t){toast.textContent=t;setTimeout(function(){toast.textContent=''},2400)}
+  function el(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e}
+  fetch('/api/controls',{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(j){
+    if(!j.ok){say(j.error);return}
+    j.panels.forEach(function(p){
+      var pn=el('div','panel');pn.appendChild(el('h2',null,p.name.toUpperCase()));var g=el('div','grid');
+      p.actions.forEach(function(a){
+        var b=el('button','b'+(a.type==='macro'?' macro':''));b.title=a.label;
+        b.appendChild(el('span','i',a.icon||'•'));b.appendChild(el('span',null,a.label));
+        b.onclick=function(){
+          if(a.confirm&&!confirm(a.label+'?'))return;
+          b.classList.add('hit');setTimeout(function(){b.classList.remove('hit')},400);
+          fetch('/api/controls/run',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:a.id})})
+          .then(function(r){return r.json()}).then(function(x){say(x.ok?a.label:x.error)});
+        };
+        g.appendChild(b);
+      });
+      pn.appendChild(g);box.appendChild(pn);
+    });
+  });
+})();
+</script></body></html>

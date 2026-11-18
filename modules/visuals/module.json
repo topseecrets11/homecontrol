@@ -1,7 +1,17 @@
 {
   "id": "visuals",
   "title": "Second Brain",
-  "tab": {"label": "BRAIN", "icon": "✺", "order": 30, "view": "frame", "src": "/m/visuals/proto.html"},
+  "tab": {
+    "label": "BRAIN",
+    "icon": "\u273a",
+    "order": 30,
+    "view": "frame",
+    "src": "/m/visuals/proto.html"
+  },
   "role": "tablet",
-  "web": "web"
+  "web": "web",
+  "modes": [
+    "vault",
+    "normal"
+  ]
 }

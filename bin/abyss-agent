@@ -19,7 +19,10 @@ import sys
 HOME = os.path.expanduser("~")
 SOCK = os.path.join(HOME, ".config", "beast-os", "abyss.sock")
 FOLDERS = ["Pictures", "Music", "Videos", "Documents", "Desktop"]
-APPS = {"blender": ["blender"]}
+# Apps that can open inside Abyss: no network, saves stay in the Abyss folder.
+APPS = {"blender": ["blender"], "kdenlive": ["kdenlive"], "gimp": ["gimp"], "inkscape": ["inkscape"],
+        "audacity": ["audacity"], "libreoffice": ["libreoffice"], "vlc": ["vlc"], "files": ["nemo", "--no-desktop", "."]}
+WARROOM = os.path.join(HOME, "Beast_War-room")
 SLICE = "abyss-apps.slice"
 
 
@@ -98,7 +101,7 @@ def op_run(req):
     root = plain(folder)
     if not mounted(root):
         raise PermissionError("Abyss is locked")
-    work = os.path.join(root, rest) if rest else os.path.join(root, app.capitalize())
+    work = os.path.join(root, rest) if rest else (root if app == "files" else os.path.join(root, app.capitalize()))
     os.makedirs(work, mode=0o700, exist_ok=True)
     workdir = os.path.join(HOME, "AbyssWork")
     os.makedirs(workdir, exist_ok=True)
@@ -112,7 +115,26 @@ def op_run(req):
     return {"running": app, "saves_to": sub or folder + "/" + app.capitalize(), "network": net}
 
 
-OPS = {"init": op_init, "mount": op_mount, "umount": op_umount, "status": op_status, "run": op_run}
+def op_wr_list(req):
+    """War Room's own action list (defaults + your edits in user.json)."""
+    r = subprocess.run([sys.executable, "-c", "import json; from core.actions import public_list; print(json.dumps(public_list()))"],
+                       cwd=WARROOM, capture_output=True, text=True, timeout=15)
+    if r.returncode:
+        raise RuntimeError("War Room actions unavailable: " + r.stderr.strip()[-200:])
+    return json.loads(r.stdout)
+
+
+def op_wr_run(req):
+    aid = str(req.get("id", ""))
+    if aid not in {a["id"] for a in op_wr_list({})}:
+        raise ValueError("unknown War Room action")
+    subprocess.Popen([sys.executable, "-m", "core.actions", aid], cwd=WARROOM,
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    return {"ran": aid}
+
+
+OPS = {"init": op_init, "mount": op_mount, "umount": op_umount, "status": op_status, "run": op_run,
+       "wr_list": op_wr_list, "wr_run": op_wr_run}
 
 
 def serve():

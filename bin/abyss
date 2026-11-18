@@ -28,7 +28,7 @@ mounted() { mountpoint -q "$HOME/$1/Abyss"; }
 
 case "${1:-open}" in
   open)
-    exec google-chrome --app="$URL/m/abyss/" --user-data-dir="$PROFILE" --window-size=1100,760 ;;
+    exec "$(dirname "$0")/beast-os-window" abyss ;;
   run)
     app="${2:-blender}"; sub="${3:-Videos/Blender}"
     mounted "${sub%%/*}" || locked

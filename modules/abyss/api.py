@@ -35,6 +35,7 @@ WARN_S = 5 * 60
 SCRYPT = dict(n=2 ** 15, r=8, p=1, maxmem=64 * 1024 * 1024, dklen=32)
 CARD_FILE = "beast-os.key"
 CARD_ROOTS = ["/media/topsee_crets", "/run/media/topsee_crets"]
+WORKSPACE_APPS = ["blender", "kdenlive", "gimp", "inkscape", "audacity", "libreoffice", "vlc", "files"]
 
 LOCK = threading.Lock()
 SESSIONS = {}          # device name -> expires (epoch)
@@ -356,7 +357,39 @@ def register(k):
     def run(req):
         require_session(req)
         b = req.json()
-        return agent("run", app=b.get("app"), sub=b.get("sub", ""), net="none")
+        app = b.get("app")
+        if app not in WORKSPACE_APPS:
+            raise ValueError("that app isn't in the Abyss workspace")
+        k.store.audit(req.who["name"], f"abyss open {app} in {b.get('sub', '')}")
+        return agent("run", app=app, sub=b.get("sub", ""), net="none")
+
+    def verify_pattern(points):
+        kr = keyring()
+        if not kr:
+            return "unset"
+        try:
+            key = _unwrap(kr["wraps"]["pattern"], pattern_secret(points))
+        except (ValueError, KeyError):
+            return None
+        return key if _check(key) == kr["check"] else None
+
+    def open_vault(who, points):
+        key = verify_pattern(points)
+        if not isinstance(key, bytes):
+            return
+        agent("mount", password=key.hex())
+        with LOCK:
+            SESSIONS[who["name"]] = time.time() + SESSION_S
+
+    def close_vault():
+        with LOCK:
+            SESSIONS.clear()
+        try:
+            agent("umount")
+        except Exception:
+            pass
+
+    k.hooks.update(verify_pattern=verify_pattern, open_vault=open_vault, close_vault=close_vault)
 
     k.route("GET", "/api/abyss/status", status, role="tablet")
     k.route("POST", "/api/abyss/setup", setup, role="owner")

@@ -1,7 +1,17 @@
 {
   "id": "prompts",
   "title": "Prompts",
-  "tab": {"label": "PROMPTS", "icon": "❯", "order": 50, "view": "frame", "src": "/m/prompts/"},
+  "tab": {
+    "label": "PROMPTS",
+    "icon": "\u276f",
+    "order": 50,
+    "view": "frame",
+    "src": "/m/prompts/"
+  },
   "role": "tablet",
-  "web": "web"
+  "web": "web",
+  "modes": [
+    "vault",
+    "normal"
+  ]
 }

@@ -1,0 +1,8 @@
+{
+  "id": "controls",
+  "title": "Controls",
+  "tab": {"label": "CONTROLS", "icon": "▦", "order": 8, "view": "frame", "src": "/m/controls/"},
+  "role": "tablet",
+  "modes": ["vault", "normal"],
+  "web": "web"
+}

@@ -1,7 +1,16 @@
 {
   "id": "abyss",
   "title": "Abyss",
-  "tab": {"label": "ABYSS", "icon": "◆", "order": 15, "view": "frame", "src": "/m/abyss/"},
+  "tab": {
+    "label": "ABYSS",
+    "icon": "\u25c6",
+    "order": 15,
+    "view": "frame",
+    "src": "/m/abyss/"
+  },
   "role": "tablet",
-  "web": "web"
+  "web": "web",
+  "modes": [
+    "vault"
+  ]
 }

@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Open a Beast OS window as its own app: own class/icon in the panel, no title bar, maximised.
+#   beast-os-window            Beast OS
+#   beast-os-window abyss      Abyss
+set -u
+URL=http://127.0.0.1:8090
+PROFILE="$HOME/.config/beast-os-chrome"
+case "${1:-os}" in
+  abyss) INST=127.0.0.1__m_abyss; PATHP=/m/abyss/ ;;
+  *)     INST=127.0.0.1;          PATHP=/ ;;
+esac
+# already open? bring it forward instead of opening another
+# Chrome names app windows after the address (WM_CLASS instance), which is how the
+# panel matches them to our launcher (StartupWMClass) and shows our icon.
+find_win() { wmctrl -lx | awk -v c="$INST.Google-chrome" '$3 == c {print $1; exit}'; }
+WID=$(find_win)
+if [ -n "$WID" ]; then wmctrl -i -a "$WID"; exit 0; fi
+google-chrome --app="$URL$PATHP" --user-data-dir="$PROFILE" \
+  --no-first-run --no-default-browser-check >/dev/null 2>&1 &
+for i in $(seq 60); do
+  WID=$(find_win)
+  [ -n "$WID" ] && break; sleep 0.2
+done
+[ -n "$WID" ] || exit 0
+sleep 0.3
+# no title bar (Motif hints: decorations off), then maximise
+xprop -id "$WID" -f _MOTIF_WM_HINTS 32c -set _MOTIF_WM_HINTS "2, 0, 0, 0, 0"
+wmctrl -i -r "$WID" -b add,maximized_vert,maximized_horz

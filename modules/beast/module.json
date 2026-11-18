@@ -1,7 +1,18 @@
 {
   "id": "beast",
   "title": "Beast Controls",
-  "tab": {"label": "BEAST", "icon": "⚡", "order": 5, "view": "frame", "src": "/m/beast/"},
+  "tab": {
+    "label": "BEAST",
+    "icon": "\u26a1",
+    "order": 5,
+    "view": "frame",
+    "src": "/m/beast/"
+  },
   "role": "guest",
-  "web": "web"
+  "web": "web",
+  "modes": [
+    "vault",
+    "normal",
+    "guest"
+  ]
 }

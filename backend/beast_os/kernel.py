@@ -152,8 +152,45 @@ class Kernel:
     def reload_config(self):
         self.cfg = load_config()
 
+    # ---- modes: vault (everything), normal (no Abyss), guest (house + toys only)
+    MODES = ("vault", "normal", "guest")
+    hooks = {}              # set by modules: verify_pattern, open_vault, close_vault
+
+    def mode(self):
+        m = self.store.kv_get("mode", "vault")
+        return m if m in self.MODES else "vault"
+
+    def module_ok(self, mod_id, mode=None):
+        mod = self.by_id.get(mod_id)
+        if not mod:
+            return True
+        return (mode or self.mode()) in mod.meta.get("modes", ["vault", "normal"])
+
+    def set_mode(self, new, who, pattern=None):
+        if new not in self.MODES:
+            raise ValueError("mode must be vault, normal or guest")
+        old = self.mode()
+        rank = {"guest": 0, "normal": 1, "vault": 2}
+        if rank[new] > rank[old]:
+            verify = self.hooks.get("verify_pattern")
+            res = verify(pattern) if verify else "unset"
+            if res == "unset":           # no Abyss pattern yet: only the owner's device can switch up
+                if who["role"] != "owner":
+                    raise PermissionError("owner only")
+            elif res is None:
+                raise PermissionError("draw your pattern to switch up")
+        if new != "vault" and self.hooks.get("close_vault"):
+            self.hooks["close_vault"]()
+        if new == "vault" and self.hooks.get("open_vault") and pattern:
+            self.hooks["open_vault"](who, pattern)
+        self.store.kv_set("mode", new)
+        self.store.audit(who["name"], f"mode {old} -> {new}")
+        self.emit("mode", {"mode": new, "by": who["name"]}, "guest")
+        return new
+
     def visible_modules(self, who):
-        return [m.public() for m in self.modules if self.auth.allows(who, m.role)]
+        mode = self.mode()
+        return [m.public() for m in self.modules if self.auth.allows(who, m.role) and self.module_ok(m.id, mode)]
 
     def find_route(self, method, path):
         r = self.routes.get((method, path))
@@ -300,9 +337,21 @@ class Handler(BaseHTTPRequestHandler):
                     return self.static(SHELL, path)
                 return self.redirect("/pair")
 
+            # modes: guest clamps every device to guest powers; switching up needs the pattern
+            mode = k.mode()
+            if path == "/api/mode":
+                if method == "POST":
+                    if not k.auth.allows(who, "tablet"):
+                        return self.fail(403, "not allowed for this device")
+                    b = Request(self, path, query, who).json()
+                    return self.send_json({"ok": True, "mode": k.set_mode(b.get("mode"), who, b.get("pattern"))})
+                return self.send_json({"ok": True, "mode": mode})
+            if mode == "guest":
+                who = dict(who, role="guest")
+
             # kernel routes
             if path == "/api/me":
-                return self.send_json({"name": who["name"], "role": who["role"]})
+                return self.send_json({"name": who["name"], "role": who["role"], "mode": mode})
             if path == "/api/modules":
                 return self.send_json({"modules": k.visible_modules(who)})
             if path == "/api/events":
@@ -314,7 +363,9 @@ class Handler(BaseHTTPRequestHandler):
             if r:
                 fn, role, opts, params = r
                 if not k.auth.allows(who, role):
-                    return self.fail(403, "not allowed for this device")
+                    return self.fail(403, "not allowed in this mode" if mode == "guest" else "not allowed for this device")
+                if opts.get("module") and not k.module_ok(opts["module"], mode):
+                    return self.fail(423, f"not available in {mode} mode")
                 req = Request(self, path, query, who, params)
                 if int(self.headers.get("Content-Length") or 0) > opts["max_body"]:
                     raise HttpError(413, "body too large")
@@ -332,7 +383,7 @@ class Handler(BaseHTTPRequestHandler):
             if path.startswith("/m/"):
                 mid, _, rest = path[3:].partition("/")
                 mod = k.by_id.get(mid)
-                if not mod or not k.auth.allows(who, mod.role):
+                if not mod or not k.auth.allows(who, mod.role) or not k.module_ok(mid, mode):
                     return self.fail(404, "no such module")
                 if mod.upstream:
                     return self.proxy(mod.upstream, "/" + rest, qs, method)
