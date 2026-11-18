@@ -44,6 +44,19 @@ button { cursor:pointer; } button:hover, button.on { border-color:var(--acc); co
 .port:hover, .port.hot { border-color:var(--acc); background:#3a3200; }
 .rs { position:absolute; right:2px; bottom:2px; width:12px; height:12px; cursor:nwse-resize; border-right:2px solid #444; border-bottom:2px solid #444; border-radius:0 0 8px 0; }
 .node.note { background:#1c1a0e; } .node.note .hd { border-bottom-color:#3a3410; }
+/* process nodes */
+.node.proc { background:#10100c; border-color:#3a3410; }
+.node.proc .hd { background:linear-gradient(90deg, rgba(255,212,0,.08), transparent); }
+.node .mosaic { flex:1; min-height:50px; display:grid; grid-template-columns:repeat(3, 1fr); gap:3px; }
+.node .mosaic div { background:#0a0a0a center/contain no-repeat; border-radius:4px; border:1px solid #1e1e1e; min-height:36px; }
+.node .mosaic div.ph { display:flex; align-items:center; justify-content:center; color:var(--dim); font-size:10px; grid-column:1/-1; text-align:center; padding:4px; }
+.node .runrow { display:flex; gap:6px; }
+.node .runrow button { flex:1; padding:5px; font-size:11px; }
+.dot { width:8px; height:8px; border-radius:50%; background:#555; display:inline-block; }
+.dot.running { background:var(--acc); animation:pulse 1s infinite; } .dot.done { background:#34d399; } .dot.stale { background:transparent; border:2px solid var(--acc); }
+.dot.error { background:#ff5f7e; } @keyframes pulse { 50% { opacity:.3; } }
+.bar2 { position:fixed; left:12px; bottom:12px; z-index:15; display:flex; gap:8px; align-items:center; background:rgba(10,10,10,.92); border:1px solid var(--line); border-radius:10px; padding:6px 8px; }
+#pal .grp { font-size:10px; color:var(--dim); letter-spacing:.2em; margin:6px 4px 2px; }
 /* palette */
 #pal { position:fixed; z-index:30; width:260px; background:#0d0d0d; border:1px solid var(--acc); border-radius:12px; padding:8px; box-shadow:0 12px 30px rgba(0,0,0,.6); }
 #pal input { width:100%; margin-bottom:6px; }
@@ -79,7 +92,7 @@ button { cursor:pointer; } button:hover, button.on { border-color:var(--acc); co
 </head>
 <body>
 <div id="gate"><h1>STORYBOARD</h1><p id="gmsg">Loading…</p><div id="plist"></div>
-  <div class="row" id="newrow"><input id="pname" placeholder="New storyboard name"> <select id="tpl"><option value="three">Simple 3-shot storyboard</option><option value="blank">Start from scratch</option></select> <button id="pnew">Create</button></div>
+  <div class="row" id="newrow"><input id="pname" placeholder="New storyboard name"> <select id="tpl"><option value="three">Simple 3-shot storyboard</option><option value="cutset">Clean cut-out set (pictures → cut-out → look → GIF)</option><option value="blank">Start from scratch</option></select> <button id="pnew">Create</button></div>
 </div>
 
 <div id="bar" class="hidden">
@@ -96,6 +109,7 @@ button { cursor:pointer; } button:hover, button.on { border-color:var(--acc); co
 
 <div id="stage" class="hidden"><div id="world"><svg id="wires" width="1" height="1"></svg></div></div>
 <canvas id="mini" class="hidden"></canvas>
+<div id="runbar" class="bar2 hidden"><button id="runall" title="Run every process node whose inputs changed">▶ Run all stale</button><span id="runinfo" style="color:var(--dim)"></span></div>
 <div id="grid" class="hidden"></div>
 <div id="seq" class="hidden"><div id="screen"><img class="shot" id="shot"><div class="cap" id="cap"></div></div>
   <div id="ctrls"><button id="play">▶ Play</button><button id="prev">⏮</button><button id="next">⏭</button><span id="sinfo" style="color:var(--dim)"></span></div>
@@ -123,8 +137,21 @@ button { cursor:pointer; } button:hover, button.on { border-color:var(--acc); co
     background: { name: 'Background', ic: '▤', w: 250, h: 190, pic: true, desc: 'Scene background / plate' },
     note:  { name: 'Note', ic: '✎', w: 220, h: 140, desc: 'Free text, sticky note, section title', fields: ['notes'] },
     reference: { name: 'Reference', ic: '⌘', w: 220, h: 150, desc: 'Link with source & licence', fields: ['url', 'notes'] },
-    sequence: { name: 'Sequence', ic: '▶', w: 210, h: 120, desc: 'Plays connected shots in order (animatic)' }
+    sequence: { name: 'Sequence', ic: '▶', w: 210, h: 120, desc: 'Plays connected shots in order (animatic)' },
+    // process nodes: run Frame Grabber's engine on whatever is wired in; results stay in Abyss
+    cutout:  { name: 'Remove background', ic: '✂', w: 230, h: 220, proc: 'cutout', desc: 'Cut the subject out (transparent PNG)',
+               opts: { model: ['people', 'general'] } },
+    parts:   { name: 'Cut into parts', ic: '⧉', w: 240, h: 230, proc: 'parts', desc: 'Head, torso, arms, legs… with pivots, ready to rig',
+               opts: { detail: ['simple', 'detailed'] } },
+    plate:   { name: 'Scene plate', ic: '▦', w: 230, h: 210, proc: 'plate', desc: 'Blend frames of one scene into a clean background' },
+    filter:  { name: 'Filter / Look', ic: '◐', w: 240, h: 230, proc: 'filter', desc: 'One look for the whole set (your Frame Grabber looks)',
+               opts: { preset: [] } },
+    upscale: { name: 'Upscale', ic: '⤢', w: 220, h: 220, proc: 'upscale', desc: 'Make pictures bigger (fast / pixel art)',
+               opts: { scale: ['2', '3', '4'], method: ['fast', 'pixel'] } },
+    gif:     { name: 'Make GIF', ic: '◎', w: 220, h: 210, proc: 'gif', desc: 'Animated GIF from the incoming pictures, in order',
+               opts: { fps: ['8', '12', '4', '24'] } }
   };
+  var PRESETS = [];
   var SHOT_TYPES = ['WIDE', 'MED', 'CLOSE', 'XCU', 'OTS', 'POV', 'INSERT'];
   var TAGS = ['var(--t0)', 'var(--t1)', 'var(--t2)', 'var(--t3)', 'var(--t4)', 'var(--t5)'];
 
@@ -136,6 +163,25 @@ button { cursor:pointer; } button:hover, button.on { border-color:var(--acc); co
   var nodeEls = {};
 
   function uid() { return Math.random().toString(36).slice(2, 9); }
+  // ---- data flow: what pictures a node passes on
+  function upstream(n) {
+    return G.wires.filter(function (w) { return w.to === n.id; }).map(function (w) { return node(w.from); })
+      .filter(Boolean).sort(function (a, b) { return a.y - b.y || a.x - b.x; });
+  }
+  function outputsOf(n, seen) {
+    seen = seen || {}; if (seen[n.id]) return []; seen[n.id] = 1;
+    if (TYPES[n.type] && TYPES[n.type].proc) return (n.outs || []).slice();
+    if (n.img) return [n.img];
+    var acc = []; upstream(n).forEach(function (u) { acc = acc.concat(outputsOf(u, seen)); }); return acc;
+  }
+  function inputsOf(n) { var acc = []; upstream(n).forEach(function (u) { acc = acc.concat(outputsOf(u)); }); return acc; }
+  function effImg(n) { return n.img || inputsOf(n)[0] || null; }
+  function sigOf(n) { return JSON.stringify([inputsOf(n), n.opt || {}]); }
+  function procState(n) {
+    if (n.state === 'running' || n.state === 'error') return n.state;
+    if (!n.outs || !n.outs.length) return inputsOf(n).length ? 'stale' : 'idle';
+    return n.sig === sigOf(n) ? 'done' : 'stale';
+  }
   function node(id) { for (var i = 0; i < G.nodes.length; i++) if (G.nodes[i].id === id) return G.nodes[i]; }
   function touch() {
     dirty = true; $('saved').textContent = 'saving…';
@@ -143,6 +189,7 @@ button { cursor:pointer; } button:hover, button.on { border-color:var(--acc); co
   }
   function save(snapshotLabel) {
     if (!P) return Promise.resolve();
+    G.nodes.forEach(function (n) { if (n.state === 'running' && !running) n.state = ''; });
     var body = { name: P, graph: G }; if (snapshotLabel) body.snapshot = snapshotLabel;
     return api('/api/storyboard/project', { method: 'PUT', json: body }).then(function () {
       dirty = false; $('saved').textContent = 'saved ' + new Date().toLocaleTimeString().slice(0, 5);
@@ -165,7 +212,11 @@ button { cursor:pointer; } button:hover, button.on { border-color:var(--acc); co
     var bd = el('div', 'bd');
     if (T.pic) {
       var pic = el('div', 'pic', 'Drop a picture here\nor click to choose');
-      function showPic() { if (n.img) { pic.style.backgroundImage = 'url("' + picUrl(n.img) + '")'; pic.classList.add('has'); } }
+      function showPic() {
+        var im = effImg(n);
+        if (im) { pic.style.backgroundImage = 'url("' + picUrl(im) + '")'; pic.classList.add('has'); pic.title = n.img ? '' : 'From the node wired in (drop a picture to override)'; }
+      }
+      d._showPic = showPic;
       showPic();
       pic.onclick = function () { var f = el('input'); f.type = 'file'; f.accept = 'image/*'; f.onchange = function () { if (f.files[0]) upload(f.files[0], n, showPic); }; f.click(); };
       pic.ondragover = function (e) { e.preventDefault(); pic.style.borderColor = 'var(--acc)'; };
@@ -189,6 +240,29 @@ button { cursor:pointer; } button:hover, button.on { border-color:var(--acc); co
       ta.value = n[f] || ''; ta.oninput = function () { n[f] = ta.value; touch(); renderSideViews(); };
       bd.appendChild(ta);
     });
+    if (T.proc) {
+      d.classList.add('proc');
+      n.opt = n.opt || {};
+      var ch2 = el('div', 'chips');
+      Object.keys(T.opts || {}).forEach(function (k) {
+        var choices = k === 'preset' ? PRESETS : T.opts[k];
+        var sel2 = el('select'); sel2.title = k;
+        if (!choices.length) sel2.appendChild(el('option', null, 'loading looks…'));
+        choices.forEach(function (c) { var o = el('option', null, c); o.value = c; sel2.appendChild(o); });
+        if (n.opt[k] === undefined && choices.length) n.opt[k] = choices[0];
+        if (n.opt[k] !== undefined) sel2.value = n.opt[k];
+        sel2.onchange = function () { n.opt[k] = sel2.value; touch(); refreshInfo(); };
+        sel2.style.maxWidth = '100%';
+        ch2.appendChild(sel2);
+      });
+      bd.appendChild(ch2);
+      var mos = el('div', 'mosaic'); bd.appendChild(mos); d._mos = mos;
+      var rr = el('div', 'runrow');
+      var rb = el('button', null, '▶ Run'); rb.onclick = function (e) { e.stopPropagation(); runNode(n); };
+      var sb = el('button', null, '→ Shots'); sb.title = 'Turn every result into a Shot on the canvas';
+      sb.onclick = function (e) { e.stopPropagation(); outsToShots(n); };
+      rr.appendChild(rb); rr.appendChild(sb); bd.appendChild(rr);
+    }
     if (n.type === 'sequence') {
       var pb = el('button', null, '▶ Play the story'); pb.onclick = function () { setView('seq'); play(true); }; bd.appendChild(pb);
     }
@@ -224,6 +298,21 @@ button { cursor:pointer; } button:hover, button.on { border-color:var(--acc); co
       var d = nodeEls[n.id]; if (!d) return;
       var ins = G.wires.filter(function (w) { return w.to === n.id; }).length, outs = G.wires.filter(function (w) { return w.from === n.id; }).length;
       d._info.textContent = n.type === 'sequence' ? orderedShots().length + ' shots · ' + totalDur().toFixed(1) + 's' : (ins + ' in · ' + outs + ' out');
+      if (d._showPic) d._showPic();
+      if (TYPES[n.type] && TYPES[n.type].proc) {
+        var st = procState(n), ni = inputsOf(n).length;
+        d._info.textContent = '';
+        d._info.appendChild(el('span', 'dot ' + st));
+        d._info.appendChild(document.createTextNode(' ' + (st === 'running' ? Math.round((n.progress || 0) * 100) + '% ' + (n.phase || '') :
+          st === 'error' ? 'error' : st === 'stale' ? (ni ? 'ready · ' + ni + ' in' : 'wire pictures in') : st === 'done' ? (n.outs.length + ' made') : 'idle')));
+        d._info.title = st === 'error' ? (n.err || '') : '';
+        var m = d._mos; if (m) {
+          m.textContent = '';
+          var show = (n.outs || []).slice(0, 6);
+          if (!show.length) m.appendChild(el('div', 'ph', ni ? ni + ' picture' + (ni > 1 ? 's' : '') + ' waiting · press Run' : 'Wire pictures into the left port'));
+          show.forEach(function (f) { var c = el('div'); c.style.backgroundImage = 'url("' + picUrl(f) + '")'; m.appendChild(c); });
+        }
+      }
     });
   }
 
@@ -413,7 +502,11 @@ button { cursor:pointer; } button:hover, button.on { border-color:var(--acc); co
   }
   function drawPal() {
     var q = $('pq').value.toLowerCase(), box = $('pitems'); box.textContent = '';
-    Object.keys(TYPES).filter(function (k) { return !q || (TYPES[k].name + ' ' + TYPES[k].desc).toLowerCase().indexOf(q) >= 0; }).forEach(function (k, i) {
+    var keys = Object.keys(TYPES).filter(function (k) { return !q || (TYPES[k].name + ' ' + TYPES[k].desc).toLowerCase().indexOf(q) >= 0; });
+    var lastGrp = null;
+    keys.forEach(function (k, i) {
+      var grp = TYPES[k].proc ? 'PROCESS · FRAME GRABBER ENGINE' : 'CONTENT';
+      if (grp !== lastGrp) { box.appendChild(el('div', 'grp', grp)); lastGrp = grp; }
       var it = el('div', 'it' + (i === 0 ? ' cur' : '')); it.dataset.type = k;
       it.appendChild(el('span', null, TYPES[k].ic)); it.appendChild(el('span', null, TYPES[k].name)); it.appendChild(el('small', null, k === 'shot' ? 'panel' : ''));
       it.title = TYPES[k].desc; it.onclick = function () { pick(k); }; box.appendChild(it);
@@ -464,7 +557,7 @@ button { cursor:pointer; } button:hover, button.on { border-color:var(--acc); co
   function setView(v) {
     curView = v;
     ['canvas', 'grid', 'seq'].forEach(function (k) { $('v-' + k).classList.toggle('on', k === v); });
-    stage.classList.toggle('hidden', v !== 'canvas'); $('mini').classList.toggle('hidden', v !== 'canvas');
+    stage.classList.toggle('hidden', v !== 'canvas'); $('mini').classList.toggle('hidden', v !== 'canvas'); $('runbar').classList.toggle('hidden', v !== 'canvas');
     $('grid').classList.toggle('hidden', v !== 'grid'); $('seq').classList.toggle('hidden', v !== 'seq');
     if (v !== 'seq') stop();
     renderSideViews();
@@ -481,7 +574,7 @@ button { cursor:pointer; } button:hover, button.on { border-color:var(--acc); co
       if (!shots.length) g.appendChild(el('div', null, 'No shots yet. Add Shot nodes on the canvas.'));
       shots.forEach(function (s, i) {
         var c = el('div', 'card'); c.draggable = true; c.dataset.id = s.id;
-        var im = el('div', 'im'); if (s.img) im.style.backgroundImage = 'url("' + picUrl(s.img) + '")';
+        var im = el('div', 'im'); if (effImg(s)) im.style.backgroundImage = 'url("' + picUrl(effImg(s)) + '")';
         im.appendChild(el('b', null, (i + 1) + ' · ' + (s.shot || 'MED') + ' · ' + (s.dur || 2) + 's'));
         var tx = el('div', 'tx'); tx.appendChild(el('div', 'n', s.title || 'Shot'));
         if (s.caption) tx.appendChild(el('div', null, s.caption)); if (s.dialogue) tx.appendChild(el('div', null, '“' + s.dialogue + '”'));
@@ -507,20 +600,72 @@ button { cursor:pointer; } button:hover, button.on { border-color:var(--acc); co
     renderAll(); renderSideViews(); touch();
   }
 
+  // ---------------------------------------------------------------- process runs (Frame Grabber engine, inside Abyss)
+  var running = 0;
+  function runNode(n) {
+    var T = TYPES[n.type], ins = inputsOf(n);
+    if (!ins.length) { toast('Wire some pictures into “' + (n.title || T.name) + '” first'); return Promise.resolve(false); }
+    if (n.state === 'running') return Promise.resolve(false);
+    n.state = 'running'; n.progress = 0; n.phase = ''; n.err = ''; refreshInfo(); running++; $('runinfo').textContent = 'running…';
+    var sig = sigOf(n);
+    return api('/api/storyboard/run', { method: 'POST', json: { project: P, node: n.id, task: T.proc, inputs: ins, options: n.opt || {} } })
+      .then(function (j) {
+        var jid = (j.result || j).job;
+        return new Promise(function (resolve) {
+          (function poll() {
+            api('/api/storyboard/job?id=' + jid).then(function (r) {
+              var J = r.result || r;
+              n.progress = J.progress || 0; n.phase = J.phase || '';
+              if (J.state === 'running') { refreshInfo(); return setTimeout(poll, 900); }
+              if (J.state === 'done') { n.outs = (J.outs || []).map(function (o) { return o.file; }); n.sig = sig; n.state = 'done'; }
+              else { n.state = 'error'; n.err = J.error || 'failed'; toast(T.name + ': ' + n.err); }
+              refreshInfo(); renderSideViews(); touch(); resolve(n.state === 'done');
+            }).catch(function (e) { n.state = 'error'; n.err = e.message; refreshInfo(); resolve(false); });
+          })();
+        });
+      })
+      .catch(function (e) { n.state = 'error'; n.err = e.message; toast(e.message); refreshInfo(); return false; })
+      .then(function (ok) { running--; $('runinfo').textContent = ''; return ok; });
+  }
+  function staleInOrder() {
+    var out = [], seen = {};
+    function visit(n) { if (seen[n.id]) return; seen[n.id] = 1; upstream(n).forEach(visit); if (TYPES[n.type] && TYPES[n.type].proc) out.push(n); }
+    G.nodes.forEach(visit); return out;
+  }
+  $('runall').onclick = function () {
+    var list = staleInOrder(), i = 0, ran = 0;
+    (function next() {
+      while (i < list.length && procState(list[i]) !== 'stale') i++;
+      if (i >= list.length) { toast(ran ? 'Done' : 'Everything is up to date'); return; }
+      $('runinfo').textContent = (i + 1) + ' / ' + list.length; ran++;
+      runNode(list[i++]).then(function (ok) { if (ok) next(); });
+    })();
+  };
+  function outsToShots(n) {
+    if (!n.outs || !n.outs.length) return toast('Run it first');
+    var made = [];
+    n.outs.forEach(function (f, i) {
+      var s2 = addNode('shot', n.x + n.w + 90 + i * 290, n.y + (i % 2) * 20, { img: f, title: (n.title || 'Shot') + ' ' + (i + 1) });
+      made.push(s2.id);
+    });
+    renderAll(); select(made); touch();
+  }
+
   // ---------------------------------------------------------------- sequence (animatic)
   var playing = false, idx = 0, timer = null;
   function drawStrip() {
     var shots = orderedShots(), st = $('strip'); st.textContent = '';
     shots.forEach(function (s, i) {
       var c = el('div', 's' + (i === idx ? ' on' : '')); c.style.width = Math.max(40, (s.dur || 2) * 40) + 'px';
-      if (s.img) c.style.backgroundImage = 'url("' + picUrl(s.img) + '")';
+      if (effImg(s)) c.style.backgroundImage = 'url("' + picUrl(effImg(s)) + '")';
       c.appendChild(el('span', null, (i + 1) + '')); c.onclick = function () { show(i); }; st.appendChild(c);
     });
     show(Math.min(idx, Math.max(0, shots.length - 1)));
   }
   function show(i) {
     var shots = orderedShots(); idx = i; var s = shots[i];
-    $('shot').src = s && s.img ? picUrl(s.img) : ''; $('shot').style.visibility = s && s.img ? 'visible' : 'hidden';
+    var si = s && effImg(s);
+    $('shot').src = si ? picUrl(si) : ''; $('shot').style.visibility = si ? 'visible' : 'hidden';
     $('cap').textContent = s ? [s.caption, s.dialogue ? '“' + s.dialogue + '”' : ''].filter(Boolean).join('  ') || s.title : 'No shots yet';
     $('sinfo').textContent = shots.length ? 'shot ' + (i + 1) + ' / ' + shots.length + ' · ' + (s.dur || 2) + 's · total ' + totalDur().toFixed(1) + 's' : '';
     document.querySelectorAll('#strip .s').forEach(function (c, k) { c.classList.toggle('on', k === i); });
@@ -581,10 +726,19 @@ button { cursor:pointer; } button:hover, button.on { border-color:var(--acc); co
       g.nodes.push({ id: uid(), type: 'note', title: 'Story', x: 80, y: -60, w: 300, h: 140, notes: 'One line: who wants what, what stops them.', tag: 0 });
       g.wires.push({ id: uid(), from: ids[0], to: ids[1] }, { id: uid(), from: ids[1], to: ids[2] }, { id: uid(), from: ids[2], to: 'seq' });
     }
+    if (kind === 'cutset') {
+      var a = uid(), b = uid(), c = uid(), d2 = uid(), e = uid();
+      g.nodes.push({ id: a, type: 'image', title: 'Your picture (drop here)', x: 60, y: 120, w: 220, h: 190, tag: 0 },
+                   { id: b, type: 'cutout', title: 'Remove background', x: 360, y: 110, w: 230, h: 220, tag: 1, opt: { model: 'people' } },
+                   { id: c, type: 'filter', title: 'One look', x: 670, y: 110, w: 240, h: 230, tag: 1, opt: {} },
+                   { id: d2, type: 'gif', title: 'GIF', x: 990, y: 120, w: 220, h: 210, tag: 3, opt: { fps: '8' } },
+                   { id: e, type: 'note', title: 'How', x: 60, y: -60, w: 380, h: 140, tag: 0, notes: 'Drop pictures on the canvas (each becomes a Shot) and wire them into Remove background, then press ▶ Run all stale (bottom left).' });
+      g.wires.push({ id: uid(), from: a, to: b }, { id: uid(), from: b, to: c }, { id: uid(), from: c, to: d2 });
+    }
     return g;
   }
   function gate(msg) {
-    $('gate').classList.remove('hidden'); ['bar', 'stage', 'mini', 'grid', 'seq'].forEach(function (i) { $(i).classList.add('hidden'); });
+    $('gate').classList.remove('hidden'); ['bar', 'stage', 'mini', 'grid', 'seq', 'runbar'].forEach(function (i) { $(i).classList.add('hidden'); });
     $('gmsg').textContent = msg || 'Loading…'; $('plist').textContent = '';
     api('/api/storyboard/projects').then(function (j) {
       $('gmsg').textContent = j.projects.length ? 'Your storyboards (encrypted inside Abyss):' : 'No storyboards yet. Make the first one:';
@@ -597,6 +751,7 @@ button { cursor:pointer; } button:hover, button.on { border-color:var(--acc); co
       P = name; G = g; G.view = G.view || { x: 60, y: 40, z: 1 }; G.snapshots = G.snapshots || [];
       $('gate').classList.add('hidden'); $('bar').classList.remove('hidden'); $('ptitle').textContent = name;
       setView('canvas'); renderAll(); fillSnaps(); $('saved').textContent = 'saved';
+      if (!PRESETS.length) api('/api/storyboard/presets').then(function (j) { PRESETS = Object.keys((j.result || j).presets || {}); renderAll(); }).catch(function () {});
     };
     if (fresh) { go(fresh); save(); return; }
     api('/api/storyboard/project?name=' + encodeURIComponent(name)).then(function (j) { go(j.graph); }).catch(function (e) { toast(e.message); });

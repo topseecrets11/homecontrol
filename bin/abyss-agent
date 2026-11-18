@@ -205,7 +205,121 @@ def op_studio_open(req):
     raise ValueError("unknown studio tool")
 
 
-OPS = {"studio_open": op_studio_open, "init": op_init, "mount": op_mount, "umount": op_umount, "status": op_status, "run": op_run,
+# ---- Frame Grabber engine for Storyboard process nodes (files stay inside Abyss)
+FG = os.path.join(HOME, "frame-grabber")
+FG_PY = os.path.join(FG, ".venv", "bin", "python")
+FG_TASKS = ("cutout", "parts", "plate", "filter", "upscale", "gif")
+JOBS = {}
+
+
+def _fg_presets():
+    r = subprocess.run([FG_PY, "-c", "import json; from filters_meta import PRESETS; print(json.dumps(PRESETS))"],
+                       cwd=FG, capture_output=True, text=True, timeout=30)
+    return json.loads(r.stdout or "{}")
+
+
+def op_fg_presets(req):
+    return {k: v.get("desc", "") for k, v in _fg_presets().items()}
+
+
+def _inside_abyss(path):
+    real = os.path.realpath(path)
+    for f in FOLDERS:
+        root = os.path.realpath(plain(f))
+        if (real == root or real.startswith(root + os.sep)) and os.path.ismount(root):
+            return real
+    raise PermissionError("Storyboard files must be inside an unlocked Abyss folder")
+
+
+def _run_fg(jid, task, inputs, outdir, prefix, options):
+    import threading, time, shutil as sh
+    J = JOBS[jid]
+    stage = os.path.join(outdir, ".stage-" + jid)
+    try:
+        os.makedirs(os.path.join(stage, "out"), exist_ok=True)
+        if task == "gif":
+            from PIL import Image
+            frames = [Image.open(p).convert("RGBA") for p in inputs]
+            w = min(int(options.get("width") or 480), frames[0].width)
+            frames = [f.resize((w, max(1, int(f.height * w / f.width)))) for f in frames]
+            name = f"{prefix}-anim.gif"
+            frames[0].save(os.path.join(outdir, name), save_all=True, append_images=frames[1:],
+                           duration=int(1000 / max(0.5, float(options.get("fps") or 8))), loop=0, disposal=2)
+            J.update(state="done", outs=[{"file": name, "variant": "animation"}], progress=1)
+            return
+        opts = dict(options)
+        if task == "filter":
+            pre = _fg_presets().get(opts.pop("preset", ""), None)
+            if not pre:
+                raise ValueError("pick a look")
+            opts["steps"] = pre["steps"]
+        if task == "upscale":
+            opts.setdefault("method", "fast")
+        job = {"task": task, "inputs": [{"id": i, "path": p} for i, p in enumerate(inputs)],
+               "outdir": os.path.join(stage, "out"), "options": opts, "tag": prefix}
+        with open(os.path.join(stage, "job.json"), "w") as f:
+            json.dump(job, f)
+        proc = subprocess.Popen([FG_PY, os.path.join(FG, "worker.py"), os.path.join(stage, "job.json")], cwd=FG,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                                env=dict(os.environ, OMP_NUM_THREADS="2"))
+        J["pid"] = proc.pid
+        outs, err = [], None
+        for line in proc.stdout:
+            try:
+                m = json.loads(line)
+            except ValueError:
+                continue
+            if "out" in m:
+                o = m["out"]
+                tag = o.get("part") or o.get("variant", "out")
+                final = f"{prefix}-{o.get('src', 0):02d}-{tag}{os.path.splitext(o['file'])[1]}"
+                sh.move(os.path.join(stage, "out", o["file"]), os.path.join(outdir, final))
+                outs.append({"file": final, "variant": o.get("variant"), "part": o.get("part")})
+                J["outs"] = list(outs)
+            elif "progress" in m:
+                J["progress"] = min(1.0, m["progress"] / max(1, m.get("total") or len(inputs)))
+            elif "phase" in m:
+                J["phase"] = m["phase"]
+            elif "error" in m:
+                err = m["error"]
+        proc.wait()
+        if proc.returncode or err:
+            raise RuntimeError(err or proc.stderr.read()[-300:] or "the engine stopped")
+        J.update(state="done", progress=1, outs=outs)
+    except Exception as e:
+        J.update(state="error", error=str(e)[:300])
+    finally:
+        sh.rmtree(stage, ignore_errors=True)
+
+
+def op_fg_run(req):
+    import threading, secrets as sc
+    task = req.get("task")
+    if task not in FG_TASKS:
+        raise ValueError("unknown process")
+    if task != "gif" and not os.path.exists(FG_PY):
+        raise RuntimeError("Frame Grabber's tools aren't installed")
+    inputs = [_inside_abyss(p) for p in req.get("inputs", [])]
+    if not inputs:
+        raise ValueError("nothing wired into this node yet")
+    if task == "gif" and len(inputs) < 2:
+        raise ValueError("a GIF needs at least 2 pictures")
+    outdir = _inside_abyss(req["outdir"])
+    prefix = "".join(c for c in str(req.get("prefix", "p")) if c.isalnum() or c in "-_")[:40] or "p"
+    jid = sc.token_hex(6)
+    JOBS[jid] = {"state": "running", "progress": 0, "phase": "starting", "outs": []}
+    threading.Thread(target=_run_fg, args=(jid, task, inputs, outdir, prefix, req.get("options") or {}), daemon=True).start()
+    return {"job": jid}
+
+
+def op_fg_job(req):
+    j = JOBS.get(req.get("job"))
+    if not j:
+        raise ValueError("no such job")
+    return {k: v for k, v in j.items() if k != "pid"}
+
+
+OPS = {"fg_presets": op_fg_presets, "fg_run": op_fg_run, "fg_job": op_fg_job, "studio_open": op_studio_open, "init": op_init, "mount": op_mount, "umount": op_umount, "status": op_status, "run": op_run,
        "wr_list": op_wr_list, "wr_run": op_wr_run}
 
 

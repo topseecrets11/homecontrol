@@ -114,6 +114,34 @@ def register(k):
             raise HttpError(404, "not found")
         return File(f, mimetypes.guess_type(f)[0] or "application/octet-stream", "private, max-age=600")
 
+    PROCESS = ("cutout", "parts", "plate", "filter", "upscale", "gif")
+
+    def presets(req):
+        return {"presets": _ab.agent("fg_presets")}
+
+    def run(req):
+        """Run a process node: inputs are picture names in this project, results land next to them."""
+        _session(req)
+        b = req.json()
+        d = os.path.join(_proj(b.get("project", "")), "pictures")
+        if b.get("task") not in PROCESS:
+            raise ValueError("unknown process")
+        ins = []
+        for name in b.get("inputs", [])[:200]:
+            f = os.path.realpath(os.path.join(d, os.path.basename(str(name))))
+            if not f.startswith(os.path.realpath(d) + os.sep) or not os.path.isfile(f):
+                raise ValueError("missing input picture: " + str(name))
+            ins.append(f)
+        opts = {k: v for k, v in (b.get("options") or {}).items() if isinstance(v, (str, int, float, bool))}
+        return _ab.agent("fg_run", task=b["task"], inputs=ins, outdir=d, prefix=str(b.get("node", "p")), options=opts)
+
+    def job(req):
+        _session(req)
+        return _ab.agent("fg_job", job=req.arg("id", ""))
+
+    k.route("GET", "/api/storyboard/presets", presets, role="owner")
+    k.route("POST", "/api/storyboard/run", run, role="owner")
+    k.route("GET", "/api/storyboard/job", job, role="owner")
     k.route("GET", "/api/storyboard/projects", projects, role="owner")
     k.route("GET", "/api/storyboard/project", load, role="owner")
     k.route("PUT", "/api/storyboard/project", save, role="owner", max_body=MAX_GRAPH)
