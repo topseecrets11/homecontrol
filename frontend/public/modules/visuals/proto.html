@@ -1,0 +1,892 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Beast OS Visuals</title>
+<style>
+  :root {
+    --bg: #050607;
+    --ink: #d8e6d8;
+    --dim: #6f7d72;
+    --accent: #32cd32;
+    --panel: rgba(10, 14, 12, 0.72);
+    --line: rgba(120, 255, 140, 0.16);
+    --mood-a: #0b1a14;
+    --mood-b: #050607;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
+    font-family: 'JetBrains Mono', 'DejaVu Sans Mono', monospace; overflow: hidden; }
+  body { background: radial-gradient(ellipse at 50% 45%, var(--mood-a) 0%, var(--mood-b) 70%); transition: background 1.2s; }
+  #brain { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  .tag { position: fixed; top: 12px; left: 16px; font-size: 11px; letter-spacing: .18em; color: var(--dim); pointer-events: none; }
+  .tag b { color: var(--accent); font-weight: 600; }
+  #state { position: fixed; top: 12px; right: 16px; font-size: 12px; letter-spacing: .2em; color: var(--accent); pointer-events: none; text-transform: uppercase; }
+  #blobwrap { position: fixed; left: 16px; bottom: 140px; width: 240px; height: 240px; }
+  #blob, #sat { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #sat { pointer-events: none; }
+  #blobwrap .lbl { position: absolute; left: 0; right: 0; bottom: -18px; text-align: center; font-size: 10px; letter-spacing: .2em; color: var(--dim); }
+  #info { position: fixed; right: 16px; top: 44px; width: min(300px, calc(100vw - 32px)); padding: 12px 14px; border: 1px solid var(--line);
+    border-radius: 12px; background: var(--panel); font-size: 12px; line-height: 1.5; display: none; backdrop-filter: blur(6px); }
+  #info h3 { margin: 0 0 4px; font-size: 13px; color: var(--accent); letter-spacing: .08em; }
+  #info .k { color: var(--dim); }
+  #reply { position: fixed; left: 50%; transform: translateX(-50%); bottom: 112px; max-width: min(560px, calc(100vw - 32px));
+    font-size: 13px; line-height: 1.5; text-align: center; color: var(--ink); text-shadow: 0 0 12px rgba(0,0,0,.9); pointer-events: none; min-height: 1.5em; }
+  #hud { position: fixed; left: 16px; right: 16px; bottom: 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); backdrop-filter: blur(6px); }
+  #hud button, #hud input[type=text] { font: inherit; font-size: 12px; color: var(--ink); background: rgba(255,255,255,.04);
+    border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; cursor: pointer; }
+  #hud button:hover { border-color: var(--accent); color: var(--accent); }
+  #hud input[type=text] { flex: 1 1 180px; min-width: 120px; cursor: text; }
+  #hud .grp { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  #hud label { font-size: 10px; letter-spacing: .12em; color: var(--dim); display: flex; align-items: center; gap: 4px; }
+  #hud input[type=range] { width: 74px; accent-color: var(--accent); }
+  .sep { width: 1px; height: 24px; background: var(--line); }
+  @media (max-width: 720px) {
+    #blobwrap { width: 150px; height: 150px; bottom: 210px; }
+    #reply { bottom: 210px; }
+    .sep { display: none; }
+  }
+</style>
+</head>
+<body>
+<canvas id="brain"></canvas>
+<div class="tag"><b>BEAST OS</b> · VISUALS PROTOTYPE · sample graph, not wired yet</div>
+<div id="state">idle</div>
+<div id="info"></div>
+<div id="reply"></div>
+<div id="blobwrap"><canvas id="blob"></canvas><canvas id="sat"></canvas><div class="lbl">MOOD</div></div>
+<div id="hud">
+  <div class="grp">
+    <button id="b-listen" title="Push to talk (uses your mic level)">◉ Hey Virge</button>
+    <input id="ask" type="text" placeholder="Ask Virgil… (prototype answer)" autocomplete="off">
+    <button id="b-act" title="Fire an action at Home Assistant">⚡ Desk light</button>
+  </div>
+  <span class="sep"></span>
+  <div class="grp">
+    <label>MOOD <input id="m-temper" type="range" min="0" max="10" step="0.1" value="6"></label>
+    <label>VITALITY <input id="m-vital" type="range" min="0" max="10" step="0.1" value="5"></label>
+    <label>RECOVERY <input id="m-recov" type="range" min="0" max="10" step="0.1" value="7"></label>
+    <label>STREAK <input id="m-streak" type="range" min="0" max="30" step="1" value="9"></label>
+    <button id="b-check">✓ Check in</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var LITE = /[?&]lite\b/.test(location.search);
+  var DPR = Math.min(window.devicePixelRatio || 1, LITE ? 1 : 1.5);
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ------------------------------------------------------------------
+  // Colour helpers
+  // ------------------------------------------------------------------
+  function hue2rgb(h) {
+    var r = Math.abs(((h * 6 + 0) % 6) - 3) - 1;
+    var g = Math.abs(((h * 6 + 4) % 6) - 3) - 1;
+    var b = Math.abs(((h * 6 + 2) % 6) - 3) - 1;
+    return [Math.min(1, Math.max(0, r)), Math.min(1, Math.max(0, g)), Math.min(1, Math.max(0, b))];
+  }
+  function rgbCss(c, a) {
+    return 'rgba(' + Math.round(c[0] * 255) + ',' + Math.round(c[1] * 255) + ',' + Math.round(c[2] * 255) + ',' + a + ')';
+  }
+  // mood 0..10 -> hue: low = blue/violet, high = gold/lime
+  function moodHue(m) { return 0.70 + (0.22 - 0.70) * (m / 10); }
+
+  // ------------------------------------------------------------------
+  // Sample graph (real names; structure stands in until Virgil is wired)
+  // ------------------------------------------------------------------
+  var CL = {
+    core:  { hue: 0.48, anchor: [0, 0, 0] },
+    mod:   { hue: 0.33 }, proj: { hue: 0.07 }, mach: { hue: 0.57 },
+    abyss: { hue: 0.76 }, mood: { hue: 0.92 }, vent: { hue: 0.13 }
+  };
+  var nodes = [], edges = [], byName = {};
+  function add(label, cl, size, kind) {
+    var n = { i: nodes.length, label: label, cl: cl, size: size || 1, kind: kind || cl, glow: 0, src: 0 };
+    nodes.push(n); byName[label] = n.i; return n.i;
+  }
+  function link(a, b, type) {
+    a = typeof a === 'string' ? byName[a] : a; b = typeof b === 'string' ? byName[b] : b;
+    if (a === undefined || b === undefined || a === b) return;
+    edges.push({ a: a, b: b, t: type || 'link' });
+  }
+  add('VIRGIL', 'core', 3.2, 'assistant');
+  ['Overview', 'Arena', 'Ledger', 'Oracle', 'Sanctum', 'Node', 'War Room', 'Home Assistant', 'Jellyfin',
+   'Abyss', 'KDE Connect', 'Prompts', 'Mood'].forEach(function (m) { add(m, 'mod', 1.7, 'module'); link('VIRGIL', m); });
+  ['Beast', 'the Event', 'Tablet', 'Phone'].forEach(function (m) { add(m, 'mach', 1.6, 'machine'); link('VIRGIL', m); });
+  link('Beast', 'Overview'); link('the Event', 'Home Assistant'); link('the Event', 'Jellyfin');
+  link('Tablet', 'Overview'); link('Phone', 'KDE Connect');
+  ['Digital products', 'Test & Tag', 'Tech deals'].forEach(function (v) { add(v, 'vent', 1.4, 'venture'); link(v, 'Arena'); link(v, 'Ledger'); });
+  link('Ledger', 'Oracle'); link('Arena', 'Oracle');
+  var projects = {
+    'War Room': 'War Room', 'You-BEAST': 'Jellyfin', 'BeastVision': 'Overview', 'Beasts Playground': 'Abyss',
+    'Frame Grabber': 'Abyss', 'HushGame': 'Jellyfin', 'Tablet deck': 'Overview', 'Test & Tag app': 'Test & Tag',
+    'Character Builder': 'Abyss', 'Lodge': 'VIRGIL', 'Wattle': 'Tech deals', 'SVG Studio': 'Abyss',
+    'Vector Rigs': 'Abyss', 'Welding Wizard': 'Digital products', 'Router Playbook': 'Node'
+  };
+  Object.keys(projects).forEach(function (p) {
+    var id = add(p === 'War Room' ? 'War Room (panel)' : p, 'proj', 1.3, 'project');
+    link(id, projects[p]);
+  });
+  ['Pictures', 'Music', 'Videos', 'Documents', 'Desktop'].forEach(function (f) { add(f + ' · Abyss', 'abyss', 1.2, 'vault'); link('Abyss', f + ' · Abyss'); });
+  add('Blender (Abyss)', 'abyss', 1.1, 'app'); link('Blender (Abyss)', 'Videos · Abyss'); link('Blender (Abyss)', 'Desktop · Abyss');
+  link('Frame Grabber', 'Pictures · Abyss'); link('You-BEAST', 'Music · Abyss');
+  var prevMood = null;
+  for (var d = 13; d >= 0; d--) {
+    var id = add('Check-in −' + d + 'd', 'mood', 0.75, 'check-in');
+    link(id, prevMood === null ? 'Mood' : prevMood); prevMood = id;
+  }
+  link(prevMood, 'Mood');
+  // notes under each project, with tangent links (stand-in for model2vec similarity)
+  var noteWords = ['idea', 'todo', 'fix', 'spec', 'sketch', 'voice note', 'snippet', 'question'];
+  var seed = 7;
+  function rnd() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
+  var projIds = nodes.filter(function (n) { return n.cl === 'proj'; }).map(function (n) { return n.i; });
+  var noteIds = [];
+  projIds.forEach(function (p) {
+    var k = 3 + Math.floor(rnd() * 5);
+    for (var j = 0; j < k; j++) {
+      var id = add(nodes[p].label + ' · ' + noteWords[Math.floor(rnd() * noteWords.length)], 'proj', 0.55, 'note');
+      nodes[id].parentProj = p; link(id, p); noteIds.push(id);
+    }
+  });
+  for (var t = 0; t < 46; t++) {
+    var a = noteIds[Math.floor(rnd() * noteIds.length)], b = noteIds[Math.floor(rnd() * noteIds.length)];
+    if (nodes[a].parentProj !== nodes[b].parentProj) link(a, b, 'tangent');
+  }
+  var N = nodes.length, E = edges.length;
+  var adj = nodes.map(function () { return []; });
+  edges.forEach(function (e) { adj[e.a].push(e.b); adj[e.b].push(e.a); });
+
+  // cluster anchors spread on a sphere
+  var clKeys = ['mod', 'proj', 'mach', 'abyss', 'mood', 'vent'];
+  clKeys.forEach(function (k, i) {
+    var phi = Math.acos(1 - 2 * (i + 0.5) / clKeys.length), th = Math.PI * (1 + Math.sqrt(5)) * i;
+    CL[k].anchor = [Math.cos(th) * Math.sin(phi) * 70, Math.cos(phi) * 50, Math.sin(th) * Math.sin(phi) * 70];
+  });
+  nodes.forEach(function (n) { n.rgb = hue2rgb(CL[n.cl].hue); });
+
+  // ------------------------------------------------------------------
+  // Force layout in a Web Worker (UI never stutters)
+  // ------------------------------------------------------------------
+  var pos = new Float32Array(N * 3);
+  var workerSrc = '(' + function () {
+    var P, V, ed, an, n, alpha = 1;
+    onmessage = function (m) {
+      var d = m.data; n = d.n; ed = d.edges; an = d.anchors;
+      P = new Float32Array(d.init); V = new Float32Array(n * 3);
+      for (var w = 0; w < 160; w++) tick();
+      loop();
+    };
+    function tick() {
+      var i, j, k;
+      for (i = 0; i < n; i++) {
+        var ix = i * 3;
+        for (j = i + 1; j < n; j++) {
+          var jx = j * 3, dx = P[ix] - P[jx], dy = P[ix + 1] - P[jx + 1], dz = P[ix + 2] - P[jx + 2];
+          var d2 = dx * dx + dy * dy + dz * dz + 0.5;
+          if (d2 > 6400) continue;
+          var f = 22 / d2;
+          V[ix] += dx * f; V[ix + 1] += dy * f; V[ix + 2] += dz * f;
+          V[jx] -= dx * f; V[jx + 1] -= dy * f; V[jx + 2] -= dz * f;
+        }
+      }
+      for (k = 0; k < ed.length; k += 3) {
+        var a = ed[k] * 3, b = ed[k + 1] * 3, rest = ed[k + 2] ? 26 : 9, ks = ed[k + 2] ? 0.003 : 0.035;
+        var ex = P[b] - P[a], ey = P[b + 1] - P[a + 1], ez = P[b + 2] - P[a + 2];
+        var len = Math.sqrt(ex * ex + ey * ey + ez * ez) + 1e-3, s = (len - rest) / len * ks;
+        V[a] += ex * s; V[a + 1] += ey * s; V[a + 2] += ez * s;
+        V[b] -= ex * s; V[b + 1] -= ey * s; V[b + 2] -= ez * s;
+      }
+      for (i = 1; i < n; i++) {
+        var ix2 = i * 3, A = an[i];
+        V[ix2] += (A[0] - P[ix2]) * 0.007; V[ix2 + 1] += (A[1] - P[ix2 + 1]) * 0.007; V[ix2 + 2] += (A[2] - P[ix2 + 2]) * 0.007;
+        V[ix2] *= 0.82; V[ix2 + 1] *= 0.82; V[ix2 + 2] *= 0.82;
+        P[ix2] += V[ix2] * alpha; P[ix2 + 1] += V[ix2 + 1] * alpha; P[ix2 + 2] += V[ix2 + 2] * alpha;
+      }
+      P[0] = P[1] = P[2] = 0;
+      alpha = Math.max(0.03, alpha * 0.99);
+    }
+    function loop() {
+      tick();
+      postMessage(P);
+      setTimeout(loop, alpha > 0.05 ? 33 : 120);
+    }
+  } + ')()';
+  var worker = new Worker(URL.createObjectURL(new Blob([workerSrc], { type: 'text/javascript' })));
+  var edgeFlat = [];
+  edges.forEach(function (e) { edgeFlat.push(e.a, e.b, e.t === 'tangent' ? 1 : 0); });
+  worker.onmessage = function (m) { pos.set(m.data); };
+  nodes.forEach(function (n, i) {
+    var A = CL[n.cl].anchor, j = i ? 22 : 0;
+    pos[i * 3] = A[0] + (rnd() - 0.5) * j; pos[i * 3 + 1] = A[1] + (rnd() - 0.5) * j; pos[i * 3 + 2] = A[2] + (rnd() - 0.5) * j;
+  });
+  worker.postMessage({ n: N, edges: edgeFlat, init: pos, anchors: nodes.map(function (n) { return CL[n.cl].anchor; }) });
+
+  // ------------------------------------------------------------------
+  // Shared state: camera, Virgil state machine, mood
+  // ------------------------------------------------------------------
+  var cam = { yaw: 0.4, pitch: -0.25, dist: 300, autospin: 1 };
+  var V = { state: 'idle', level: 0, ring: 0, think: 0, speak: 0, act: 0, t0: 0 };
+  var mood = { temper: 6, vital: 5, recov: 7, streak: 9 };
+  var moodNow = { hue: moodHue(6), wob: 0.5, smooth: 0.7, size: 0.85 };
+  var moodVel = { hue: 0, wob: 0, smooth: 0, size: 0 };
+  var pulses = [];
+  var lastInteract = performance.now();
+  var micAnalyser = null, micBuf = null;
+
+  function setState(s) {
+    V.state = s; V.t0 = performance.now();
+    $('state').textContent = s === 'idle' ? 'idle' : s + ' …';
+  }
+
+  function moodTarget() {
+    return {
+      hue: moodHue(mood.temper),
+      wob: mood.vital / 10,
+      smooth: mood.recov / 10,
+      size: 0.7 + Math.min(mood.streak, 30) / 30 * 0.35
+    };
+  }
+  function applyAmbient() {
+    var c = hue2rgb(moodNow.hue);
+    document.documentElement.style.setProperty('--mood-a', rgbCss([c[0] * 0.14, c[1] * 0.14, c[2] * 0.14], 1));
+  }
+
+  // ------------------------------------------------------------------
+  // Projection (shared by renderers + picking)
+  // ------------------------------------------------------------------
+  var W = 1, H = 1;
+  function project(x, y, z, out) {
+    var cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw), cx = Math.cos(cam.pitch), sx = Math.sin(cam.pitch);
+    var x1 = cy * x + sy * z, z1 = -sy * x + cy * z;
+    var y2 = cx * y - sx * z1, z2 = sx * y + cx * z1;
+    var depth = cam.dist - z2;
+    var f = Math.min(W, H) * 1.25 / depth;
+    out[0] = W / 2 + x1 * f; out[1] = H / 2 - y2 * f; out[2] = depth; out[3] = f;
+    return out;
+  }
+
+  // ------------------------------------------------------------------
+  // Virgil behaviours
+  // ------------------------------------------------------------------
+  function firePulse(from, to, delay, hue, onArrive) {
+    pulses.push({ a: from, b: to, start: performance.now() + (delay || 0), dur: 520, hue: hue, cb: onArrive });
+  }
+  function retrievalPath(query) {
+    // prototype: walk the graph from a node whose label matches the query, else a hub
+    var words = (query || '').toLowerCase().split(/[^a-z0-9&]+/).filter(function (w) { return w.length > 3; });
+    var startN = -1;
+    for (var i = 1; i < N && startN < 0; i++) {
+      var lab = nodes[i].label.toLowerCase();
+      for (var w = 0; w < words.length; w++) if (lab.indexOf(words[w]) >= 0) { startN = i; break; }
+    }
+    if (startN < 0) startN = byName['Arena'];
+    var path = [0], seen = {}; seen[0] = 1;
+    var cur = startN; path.push(cur); seen[cur] = 1;
+    for (var s = 0; s < 5; s++) {
+      var nb = adj[cur].filter(function (x) { return !seen[x]; });
+      if (!nb.length) break;
+      cur = nb[Math.floor(Math.random() * nb.length)]; path.push(cur); seen[cur] = 1;
+    }
+    return path;
+  }
+  var REPLIES = [
+    'Pulled what I know. Wired to Hermes soon, so this answer is a placeholder.',
+    'Found it across your projects and the Ledger. The real answer lands when Hermes is live.',
+    'Here is what your second brain links to that. Prototype voice only for now.'
+  ];
+  function ask(text) {
+    if (!text) return;
+    lastInteract = performance.now();
+    setState('thinking');
+    $('reply').textContent = '';
+    nodes.forEach(function (n) { n.src = 0; });
+    var path = retrievalPath(text), step = 0;
+    function next() {
+      if (step >= path.length - 1) { setTimeout(speak, 200); return; }
+      var a = path[step], b = path[step + 1]; step++;
+      firePulse(a, b, 0, 0.48, function () { nodes[b].glow = 1.4; nodes[b].src = 1; next(); });
+    }
+    next();
+  }
+  function speak() {
+    setState('speaking');
+    var msg = REPLIES[Math.floor(Math.random() * REPLIES.length)], i = 0;
+    var typer = setInterval(function () {
+      i += 2; $('reply').textContent = msg.slice(0, i);
+      if (i >= msg.length) { clearInterval(typer); setTimeout(function () { setState('idle'); nodes.forEach(function (n) { n.src = 0; }); }, 1400); }
+    }, 38);
+  }
+  function act(targetLabel) {
+    lastInteract = performance.now();
+    setState('acting');
+    var t = byName[targetLabel];
+    var hop = byName['the Event'];
+    firePulse(0, hop, 0, 0.13, function () {
+      nodes[hop].glow = 1;
+      firePulse(hop, t, 0, 0.13, function () {
+        nodes[t].glow = 2.2;
+        $('reply').textContent = 'Desk light on. (Demo; Home Assistant gets wired in the kernel.)';
+        setTimeout(function () { setState('idle'); $('reply').textContent = ''; }, 1600);
+      });
+    });
+  }
+  function listen() {
+    lastInteract = performance.now();
+    if (V.state === 'listening') { setState('idle'); return; }
+    setState('listening');
+    if (!micAnalyser && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+        var ac = new (window.AudioContext || window.webkitAudioContext)();
+        var src = ac.createMediaStreamSource(stream);
+        micAnalyser = ac.createAnalyser(); micAnalyser.fftSize = 512;
+        micBuf = new Uint8Array(micAnalyser.fftSize); src.connect(micAnalyser);
+      }).catch(function () { micAnalyser = null; });
+    }
+    setTimeout(function () { if (V.state === 'listening') ask('what did I note about the Arena'); }, 5200);
+  }
+  function micLevel(now) {
+    if (micAnalyser) {
+      micAnalyser.getByteTimeDomainData(micBuf);
+      var s = 0; for (var i = 0; i < micBuf.length; i++) { var v = (micBuf[i] - 128) / 128; s += v * v; }
+      return Math.min(1, Math.sqrt(s / micBuf.length) * 5);
+    }
+    return 0.25 + 0.25 * Math.sin(now / 130) * Math.sin(now / 370);   // simulated if mic unavailable
+  }
+  function speechEnvelope(now) {   // stand-in for Piper's real audio envelope
+    var syl = Math.max(0, Math.sin(now / 95)) * (0.6 + 0.4 * Math.sin(now / 41));
+    var gap = Math.sin(now / 900) > -0.6 ? 1 : 0.1;
+    return syl * gap;
+  }
+
+  // ------------------------------------------------------------------
+  // WebGL helpers
+  // ------------------------------------------------------------------
+  function compile(gl, vs, fs) {
+    function sh(type, src) {
+      var s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+      return s;
+    }
+    var p = gl.createProgram();
+    gl.attachShader(p, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(p, sh(gl.FRAGMENT_SHADER, fs));
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    var u = {}, n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+    for (var i = 0; i < n; i++) { var info = gl.getActiveUniform(p, i); u[info.name] = gl.getUniformLocation(p, info.name); }
+    return { p: p, u: u };
+  }
+  var NOISE = [
+    'vec3 mod289(vec3 x){return x-floor(x*(1.0/289.0))*289.0;}',
+    'vec4 mod289(vec4 x){return x-floor(x*(1.0/289.0))*289.0;}',
+    'vec4 permute(vec4 x){return mod289(((x*34.0)+10.0)*x);}',
+    'vec4 taylorInvSqrt(vec4 r){return 1.79284291400159-0.85373472095314*r;}',
+    'float snoise(vec3 v){const vec2 C=vec2(1.0/6.0,1.0/3.0);const vec4 D=vec4(0.0,0.5,1.0,2.0);',
+    'vec3 i=floor(v+dot(v,C.yyy));vec3 x0=v-i+dot(i,C.xxx);vec3 g=step(x0.yzx,x0.xyz);vec3 l=1.0-g;',
+    'vec3 i1=min(g.xyz,l.zxy);vec3 i2=max(g.xyz,l.zxy);vec3 x1=x0-i1+C.xxx;vec3 x2=x0-i2+C.yyy;vec3 x3=x0-D.yyy;',
+    'i=mod289(i);vec4 p=permute(permute(permute(i.z+vec4(0.0,i1.z,i2.z,1.0))+i.y+vec4(0.0,i1.y,i2.y,1.0))+i.x+vec4(0.0,i1.x,i2.x,1.0));',
+    'float n_=0.142857142857;vec3 ns=n_*D.wyz-D.xzx;vec4 j=p-49.0*floor(p*ns.z*ns.z);vec4 x_=floor(j*ns.z);vec4 y_=floor(j-7.0*x_);',
+    'vec4 x=x_*ns.x+ns.yyyy;vec4 y=y_*ns.x+ns.yyyy;vec4 h=1.0-abs(x)-abs(y);vec4 b0=vec4(x.xy,y.xy);vec4 b1=vec4(x.zw,y.zw);',
+    'vec4 s0=floor(b0)*2.0+1.0;vec4 s1=floor(b1)*2.0+1.0;vec4 sh=-step(h,vec4(0.0));',
+    'vec4 a0=b0.xzyw+s0.xzyw*sh.xxyy;vec4 a1=b1.xzyw+s1.xzyw*sh.zzww;',
+    'vec3 p0=vec3(a0.xy,h.x);vec3 p1=vec3(a0.zw,h.y);vec3 p2=vec3(a1.xy,h.z);vec3 p3=vec3(a1.zw,h.w);',
+    'vec4 norm=taylorInvSqrt(vec4(dot(p0,p0),dot(p1,p1),dot(p2,p2),dot(p3,p3)));p0*=norm.x;p1*=norm.y;p2*=norm.z;p3*=norm.w;',
+    'vec4 m=max(0.5-vec4(dot(x0,x0),dot(x1,x1),dot(x2,x2),dot(x3,x3)),0.0);m=m*m;',
+    'return 105.0*dot(m*m,vec4(dot(p0,x0),dot(p1,x1),dot(p2,x2),dot(p3,x3)));}',
+    'vec3 hue(float h){return clamp(abs(mod(h*6.0+vec3(0.0,4.0,2.0),6.0)-3.0)-1.0,0.0,1.0);}'
+  ].join('\n');
+
+  // ------------------------------------------------------------------
+  // Brain renderer (WebGL2): neurons, filaments, pulses, nebula, Virgil core
+  // ------------------------------------------------------------------
+  function BrainGL(canvas) {
+    var gl = canvas.getContext('webgl2', { antialias: false, premultipliedAlpha: true, alpha: true });
+    if (!gl) return null;
+    var PROJ = [
+      'uniform vec2 u_rot; uniform float u_dist; uniform vec2 u_view;',
+      'vec4 proj(vec3 p, out float f){',
+      ' float cy=cos(u_rot.x), sy=sin(u_rot.x), cx=cos(u_rot.y), sx=sin(u_rot.y);',
+      ' vec3 q=vec3(cy*p.x+sy*p.z, p.y, -sy*p.x+cy*p.z);',
+      ' vec3 r=vec3(q.x, cx*q.y-sx*q.z, sx*q.y+cx*q.z);',
+      ' float depth=u_dist-r.z; f=min(u_view.x,u_view.y)*1.25/depth;',
+      ' vec2 s=vec2(r.x*f, r.y*f)/(u_view*0.5);',
+      ' return vec4(s, 0.0, 1.0);}'
+    ].join('\n');
+    var pts = compile(gl,
+      '#version 300 es\nin vec3 a_pos; in vec3 a_col; in float a_size; in float a_glow;\n' + PROJ +
+      '\nuniform float u_px; out vec3 v_col; out float v_glow;\n' +
+      'void main(){ float f; gl_Position=proj(a_pos,f); v_col=a_col; v_glow=a_glow;\n' +
+      ' gl_PointSize=a_size*(1.0+a_glow*0.9)*f*u_px*6.5; }',
+      '#version 300 es\nprecision mediump float; in vec3 v_col; in float v_glow; out vec4 o;\n' +
+      'void main(){ vec2 d=gl_PointCoord*2.0-1.0; float r2=dot(d,d); if(r2>1.0) discard;\n' +
+      ' float core=exp(-r2*22.0); float halo=exp(-r2*3.2)*0.32;\n' +
+      ' float a=(core+halo)*(0.5+v_glow*0.8);\n' +
+      ' vec3 c=v_col*(halo*1.4+core)+vec3(1.0)*core*(0.25+v_glow*0.55);\n' +
+      ' o=vec4(c*a, a*0.5); }');
+    var lines = compile(gl,
+      '#version 300 es\nin vec3 a_pos; in vec4 a_col;\n' + PROJ +
+      '\nout vec4 v_col; void main(){ float f; gl_Position=proj(a_pos,f); v_col=a_col; }',
+      '#version 300 es\nprecision mediump float; in vec4 v_col; out vec4 o; void main(){ o=vec4(v_col.rgb*v_col.a, v_col.a); }');
+    var orb = compile(gl,
+      '#version 300 es\nin vec2 a_q; uniform vec2 u_view; uniform float u_size; out vec2 v_uv;\n' +
+      'void main(){ v_uv=a_q; gl_Position=vec4(a_q*u_size/(u_view*0.5),0.0,1.0); }',
+      '#version 300 es\nprecision highp float; in vec2 v_uv; out vec4 o;\n' +
+      'uniform float u_t, u_level, u_ring, u_think, u_speak, u_act, u_hue;\n' + NOISE + '\n' +
+      'float fbm(vec3 p){ float s=0.0, a=0.5; for(int i=0;i<4;i++){ s+=a*snoise(p); p*=2.03; a*=0.5; } return s; }\n' +
+      'void main(){ vec2 uv=v_uv; float r=length(uv); float an=atan(uv.y,uv.x); float t=u_t;\n' +
+      ' float spin=t*(0.25+u_think*1.6);\n' +
+      ' float breath=0.015*sin(t*1.2);\n' +
+      ' float R=0.26+breath+u_speak*0.07+u_think*0.015;\n' +
+      ' float n=fbm(vec3(uv*2.4, t*0.22+u_think*t*0.4));\n' +
+      ' vec3 base=hue(u_hue); vec3 hot=mix(base, vec3(1.0), 0.55);\n' +
+      ' float body=smoothstep(R+0.015, R-0.03, r+n*0.035);\n' +
+      ' float sw=fbm(vec3(cos(an+spin)*r*4.0, sin(an+spin)*r*4.0, t*0.3));\n' +
+      ' vec3 inner=mix(base*0.35, hot, smoothstep(-0.3,0.6,sw)) + vec3(1.0)*pow(max(0.0,1.0-r/R),3.0)*0.9;\n' +
+      ' float rim=0.022/(abs(r-R)+0.022);\n' +
+      ' float glow=exp(-r*3.2)*(0.35+u_level*0.6+u_think*0.5+u_speak*0.8);\n' +
+      ' float rr=0.47+0.035*u_level*sin(an*7.0+t*5.0)+0.02*snoise(vec3(cos(an)*2.0,sin(an)*2.0,t*1.5))*u_level;\n' +
+      ' float ring=u_ring*(smoothstep(0.012,0.0,abs(r-rr))*0.9 + 0.012/(abs(r-rr)+0.012)*0.25);\n' +
+      ' float orbit=0.0; for(int k=0;k<3;k++){ float fk=float(k); float ang=an-spin*(1.0+fk*0.6)-fk*2.1;\n' +
+      '   float rad=0.36+fk*0.05; float arc=smoothstep(0.75,1.0,cos(ang)); orbit+=arc*smoothstep(0.008,0.0,abs(r-rad)); }\n' +
+      ' orbit*=u_think;\n' +
+      ' float shock=u_act*smoothstep(0.02,0.0,abs(r-(0.3+(1.0-u_act)*0.6)));\n' +
+      ' vec3 c=inner*body + hot*rim*0.55*(1.0-body) + base*glow + hot*(ring+orbit) + vec3(1.0,0.85,0.4)*shock;\n' +
+      ' float a=clamp(max(body, (rim*0.4+glow+ring+orbit+shock)*(1.0-smoothstep(0.85,1.0,r))),0.0,1.0);\n' +
+      ' o=vec4(c*a, a); }');
+
+    var bPos = gl.createBuffer(), bCol = gl.createBuffer(), bSize = gl.createBuffer(), bGlow = gl.createBuffer();
+    var lPos = gl.createBuffer(), lCol = gl.createBuffer(), qBuf = gl.createBuffer();
+    var vaoP = gl.createVertexArray(), vaoL = gl.createVertexArray(), vaoQ = gl.createVertexArray();
+    var maxPts = N + 64 + 8;
+    var colArr = new Float32Array(maxPts * 3), sizeArr = new Float32Array(maxPts), glowArr = new Float32Array(maxPts), posArr = new Float32Array(maxPts * 3);
+    var lpos = new Float32Array(E * 6), lcol = new Float32Array(E * 8);
+
+    function attr(prog, name, buf, size) {
+      var loc = gl.getAttribLocation(prog.p, name);
+      gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.enableVertexAttribArray(loc);
+      gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 0, 0);
+    }
+    gl.bindVertexArray(vaoP);
+    gl.bindBuffer(gl.ARRAY_BUFFER, bPos); gl.bufferData(gl.ARRAY_BUFFER, posArr.byteLength, gl.DYNAMIC_DRAW); attr(pts, 'a_pos', bPos, 3);
+    gl.bindBuffer(gl.ARRAY_BUFFER, bCol); gl.bufferData(gl.ARRAY_BUFFER, colArr.byteLength, gl.DYNAMIC_DRAW); attr(pts, 'a_col', bCol, 3);
+    gl.bindBuffer(gl.ARRAY_BUFFER, bSize); gl.bufferData(gl.ARRAY_BUFFER, sizeArr.byteLength, gl.DYNAMIC_DRAW); attr(pts, 'a_size', bSize, 1);
+    gl.bindBuffer(gl.ARRAY_BUFFER, bGlow); gl.bufferData(gl.ARRAY_BUFFER, glowArr.byteLength, gl.DYNAMIC_DRAW); attr(pts, 'a_glow', bGlow, 1);
+    gl.bindVertexArray(vaoL);
+    gl.bindBuffer(gl.ARRAY_BUFFER, lPos); gl.bufferData(gl.ARRAY_BUFFER, lpos.byteLength, gl.DYNAMIC_DRAW); attr(lines, 'a_pos', lPos, 3);
+    gl.bindBuffer(gl.ARRAY_BUFFER, lCol); gl.bufferData(gl.ARRAY_BUFFER, lcol.byteLength, gl.DYNAMIC_DRAW); attr(lines, 'a_col', lCol, 4);
+    gl.bindVertexArray(vaoQ);
+    gl.bindBuffer(gl.ARRAY_BUFFER, qBuf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW); attr(orb, 'a_q', qBuf, 2);
+    gl.bindVertexArray(null);
+
+    function common(prog, w, h) {
+      gl.uniform2f(prog.u.u_rot, cam.yaw, cam.pitch);
+      gl.uniform1f(prog.u.u_dist, cam.dist);
+      gl.uniform2f(prog.u.u_view, w, h);
+    }
+
+    return function draw(now, w, h) {
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);
+      var tint = hue2rgb(moodNow.hue);
+
+      // filaments
+      var srcLit = V.state === 'speaking' || V.state === 'thinking';
+      for (var k = 0; k < E; k++) {
+        var e = edges[k], A = e.a * 3, B = e.b * 3;
+        lpos[k * 6] = pos[A]; lpos[k * 6 + 1] = pos[A + 1]; lpos[k * 6 + 2] = pos[A + 2];
+        lpos[k * 6 + 3] = pos[B]; lpos[k * 6 + 4] = pos[B + 1]; lpos[k * 6 + 5] = pos[B + 2];
+        var na = nodes[e.a], nb = nodes[e.b];
+        var lit = (na.src && nb.src && srcLit) ? 0.55 : 0;
+        var al = (e.t === 'tangent' ? 0.05 : 0.11) + (na.glow + nb.glow) * 0.06 + lit;
+        for (var s2 = 0; s2 < 2; s2++) {
+          var c = (s2 ? nb : na).rgb, o2 = k * 8 + s2 * 4;
+          lcol[o2] = c[0] * 0.7 + tint[0] * 0.3; lcol[o2 + 1] = c[1] * 0.7 + tint[1] * 0.3; lcol[o2 + 2] = c[2] * 0.7 + tint[2] * 0.3; lcol[o2 + 3] = Math.min(0.8, al);
+        }
+      }
+      gl.useProgram(lines.p); common(lines, w, h);
+      gl.bindVertexArray(vaoL);
+      gl.bindBuffer(gl.ARRAY_BUFFER, lPos); gl.bufferSubData(gl.ARRAY_BUFFER, 0, lpos);
+      gl.bindBuffer(gl.ARRAY_BUFFER, lCol); gl.bufferSubData(gl.ARRAY_BUFFER, 0, lcol);
+      gl.drawArrays(gl.LINES, 0, E * 2);
+
+      // neurons + nebula + pulses (one point batch)
+      var count = 0;
+      function push(x, y, z, c, size, glow) {
+        posArr[count * 3] = x; posArr[count * 3 + 1] = y; posArr[count * 3 + 2] = z;
+        colArr[count * 3] = c[0]; colArr[count * 3 + 1] = c[1]; colArr[count * 3 + 2] = c[2];
+        sizeArr[count] = size; glowArr[count] = glow; count++;
+      }
+      // nebula fog: one big faint sprite per cluster centroid
+      clKeys.forEach(function (key) {
+        var sx = 0, sy = 0, sz = 0, m = 0;
+        for (var i = 0; i < N; i++) if (nodes[i].cl === key) { sx += pos[i * 3]; sy += pos[i * 3 + 1]; sz += pos[i * 3 + 2]; m++; }
+        if (!m) return;
+        var c = hue2rgb(CL[key].hue);
+        push(sx / m, sy / m, sz / m, [c[0] * 0.06, c[1] * 0.06, c[2] * 0.06], 16, 0);
+      });
+      for (var i = 1; i < N; i++) {
+        var n = nodes[i];
+        var g = n.glow + (n.src && srcLit ? 0.6 : 0);
+        if (V.state === 'listening') {
+          var dx = pos[i * 3], dy = pos[i * 3 + 1], dz = pos[i * 3 + 2];
+          var near = Math.max(0, 1 - Math.sqrt(dx * dx + dy * dy + dz * dz) / 70);
+          g += near * V.level * 0.9;
+        }
+        g += 0.08 * Math.sin(now / 900 + i * 1.7);   // living shimmer
+        push(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2], n.rgb, n.size, Math.max(0, g));
+      }
+      // pulses with short trails
+      for (var p = 0; p < pulses.length; p++) {
+        var pl = pulses[p], u = (now - pl.start) / pl.dur;
+        if (u < 0 || u > 1) continue;
+        var pc = hue2rgb(pl.hue);
+        for (var tr = 0; tr < 4; tr++) {
+          var uu = Math.max(0, u - tr * 0.05);
+          var a3 = pl.a * 3, b3 = pl.b * 3;
+          push(pos[a3] + (pos[b3] - pos[a3]) * uu, pos[a3 + 1] + (pos[b3 + 1] - pos[a3 + 1]) * uu, pos[a3 + 2] + (pos[b3 + 2] - pos[a3 + 2]) * uu,
+               [pc[0] * 0.6 + 0.4, pc[1] * 0.6 + 0.4, pc[2] * 0.6 + 0.4], 1.4 - tr * 0.28, 1.6 - tr * 0.35);
+        }
+      }
+      gl.useProgram(pts.p); common(pts, w, h);
+      gl.uniform1f(pts.u.u_px, DPR);
+      gl.bindVertexArray(vaoP);
+      gl.bindBuffer(gl.ARRAY_BUFFER, bPos); gl.bufferSubData(gl.ARRAY_BUFFER, 0, posArr, 0, count * 3);
+      gl.bindBuffer(gl.ARRAY_BUFFER, bCol); gl.bufferSubData(gl.ARRAY_BUFFER, 0, colArr, 0, count * 3);
+      gl.bindBuffer(gl.ARRAY_BUFFER, bSize); gl.bufferSubData(gl.ARRAY_BUFFER, 0, sizeArr, 0, count);
+      gl.bindBuffer(gl.ARRAY_BUFFER, bGlow); gl.bufferSubData(gl.ARRAY_BUFFER, 0, glowArr, 0, count);
+      gl.drawArrays(gl.POINTS, 0, count);
+
+      // Virgil core orb, screen-space at the brain's centre
+      gl.useProgram(orb.p);
+      gl.uniform2f(orb.u.u_view, w, h);
+      gl.uniform1f(orb.u.u_size, Math.min(w, h) * 0.36 * (1.25 * 260 / cam.dist));
+      gl.uniform1f(orb.u.u_t, now / 1000);
+      gl.uniform1f(orb.u.u_level, V.level);
+      gl.uniform1f(orb.u.u_ring, V.ring);
+      gl.uniform1f(orb.u.u_think, V.think);
+      gl.uniform1f(orb.u.u_speak, V.speak);
+      gl.uniform1f(orb.u.u_act, V.act);
+      gl.uniform1f(orb.u.u_hue, 0.48 * 0.7 + moodNow.hue * 0.3);
+      gl.bindVertexArray(vaoQ);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      gl.bindVertexArray(null);
+    };
+  }
+
+  // ------------------------------------------------------------------
+  // Mood blob renderer (WebGL2 raymarched SDF)
+  // ------------------------------------------------------------------
+  function BlobGL(canvas) {
+    var gl = canvas.getContext('webgl2', { antialias: false, premultipliedAlpha: true, alpha: true });
+    if (!gl) return null;
+    var prog = compile(gl,
+      '#version 300 es\nin vec2 a_q; void main(){ gl_Position=vec4(a_q,0.0,1.0); }',
+      '#version 300 es\nprecision highp float; out vec4 o;\n' +
+      'uniform vec2 u_res; uniform float u_t, u_hue, u_wob, u_smooth, u_size, u_ripple; uniform vec4 u_poke;\n' + NOISE + '\n' +
+      'float map(vec3 p){ float r=0.62*u_size; float spd=0.18+u_wob*0.8;\n' +
+      ' vec3 q=p*1.15+vec3(0.0,0.0,u_t*spd);\n' +
+      ' float n1=snoise(q); float n2=snoise(q*1.9+7.1);\n' +
+      ' float ridged=1.0-abs(snoise(q*2.1-3.3)); float rough=smoothstep(0.35,1.0,1.0-u_smooth); float spikes=pow(ridged,4.0)*rough;\n' +
+      ' float amp=0.05+u_wob*0.12;\n' +
+      ' float d=length(p)-r-(n1*0.7+n2*0.2)*amp-spikes*0.2;\n' +
+      ' d-=0.018*sin(u_t*1.3);\n' +
+      ' vec3 np=normalize(p); vec3 pd=np-u_poke.xyz; d+=u_poke.w*exp(-dot(pd,pd)*5.0)*0.14;\n' +
+      ' d-=u_ripple*0.035*sin(length(p)*22.0-u_t*14.0);\n' +
+      ' return d*0.6; }\n' +
+      'vec3 nrm(vec3 p){ const vec2 k=vec2(1.0,-1.0); float e=0.002;\n' +
+      ' return normalize(k.xyy*map(p+k.xyy*e)+k.yyx*map(p+k.yyx*e)+k.yxy*map(p+k.yxy*e)+k.xxx*map(p+k.xxx*e)); }\n' +
+      'void main(){ vec2 uv=(gl_FragCoord.xy*2.0-u_res)/u_res.y;\n' +
+      ' vec3 ro=vec3(0.0,0.0,2.3); vec3 rd=normalize(vec3(uv*0.92,-1.5));\n' +
+      ' vec3 base=hue(u_hue); float glowAcc=0.0;\n' +
+      ' float b=dot(ro,rd); float c=dot(ro,ro)-1.05; float hdisc=b*b-c;\n' +
+      ' if(hdisc<0.0){ float rr=length(uv); float g=0.05/(rr*rr+0.05)*0.18; o=vec4(base*g, g); return; }\n' +
+      ' float t=max(0.0,-b-sqrt(hdisc)); bool hit=false; vec3 p;\n' +
+      ' for(int i=0;i<56;i++){ p=ro+rd*t; float d=map(p); glowAcc+=0.012/(1.0+d*d*120.0); if(d<0.001){hit=true;break;} t+=d*0.9; if(t>4.0) break; }\n' +
+      ' if(!hit){ float g=min(1.0,glowAcc*1.4); o=vec4(base*g, g); return; }\n' +
+      ' vec3 n=nrm(p); float ndv=max(dot(n,-rd),0.0); float fres=pow(1.0-ndv,3.0);\n' +
+      ' vec3 film=0.5+0.5*cos(6.2831*(vec3(0.0,0.33,0.67)+u_hue+fres*0.8+n.y*0.15));\n' +
+      ' vec3 L=normalize(vec3(-0.5,0.8,0.6)); float dif=max(dot(n,L),0.0);\n' +
+      ' float spec=pow(max(dot(reflect(-L,n),-rd),0.0),40.0);\n' +
+      ' float sss=pow(ndv,2.0)*0.5;\n' +
+      ' vec3 col=base*(0.18+dif*0.45)+film*(0.25+fres*0.9)*0.7+base*sss+vec3(1.0)*spec*0.9;\n' +
+      ' o=vec4(col,1.0); }');
+    var buf = gl.createBuffer(), vao = gl.createVertexArray();
+    gl.bindVertexArray(vao);
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+    var loc = gl.getAttribLocation(prog.p, 'a_q'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    return function draw(now, poke, ripple) {
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.useProgram(prog.p);
+      gl.uniform2f(prog.u.u_res, canvas.width, canvas.height);
+      gl.uniform1f(prog.u.u_t, now / 1000);
+      gl.uniform1f(prog.u.u_hue, moodNow.hue);
+      gl.uniform1f(prog.u.u_wob, moodNow.wob);
+      gl.uniform1f(prog.u.u_smooth, moodNow.smooth);
+      gl.uniform1f(prog.u.u_size, moodNow.size);
+      gl.uniform1f(prog.u.u_ripple, ripple);
+      gl.uniform4f(prog.u.u_poke, poke[0], poke[1], poke[2], poke[3]);
+      gl.bindVertexArray(vao); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    };
+  }
+
+  // ------------------------------------------------------------------
+  // Lite renderers (Canvas2D) for the tablet's old WebView
+  // ------------------------------------------------------------------
+  function sprite(c) {
+    var s = document.createElement('canvas'); s.width = s.height = 64;
+    var x = s.getContext('2d'), g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+    g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.18, rgbCss(c, 0.9)); g.addColorStop(1, rgbCss(c, 0));
+    x.fillStyle = g; x.fillRect(0, 0, 64, 64); return s;
+  }
+  function BrainLite(canvas) {
+    var ctx = canvas.getContext('2d'), sprites = {}, tmp = [0, 0, 0, 0];
+    Object.keys(CL).forEach(function (k) { sprites[k] = sprite(hue2rgb(CL[k].hue)); });
+    var white = sprite([1, 1, 1]);
+    var shown = nodes.filter(function (n) { return n.kind !== 'note' || n.i % 3 === 0; }).map(function (n) { return n.i; });
+    return function draw(now, w, h) {
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.clearRect(0, 0, w, h);
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.lineWidth = 1;
+      for (var k = 0; k < E; k++) {
+        var e = edges[k]; if (e.t === 'tangent') continue;
+        var A = project(pos[e.a * 3], pos[e.a * 3 + 1], pos[e.a * 3 + 2], [0, 0, 0, 0]);
+        var B = project(pos[e.b * 3], pos[e.b * 3 + 1], pos[e.b * 3 + 2], tmp);
+        ctx.strokeStyle = rgbCss(nodes[e.a].rgb, 0.12 + (nodes[e.a].src && nodes[e.b].src ? 0.4 : 0));
+        ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke();
+      }
+      shown.forEach(function (i) {
+        if (!i) return;
+        var n = nodes[i], P = project(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2], tmp);
+        var s = n.size * P[3] * 16 * (1 + n.glow * 0.8 + (n.src ? 0.6 : 0));
+        ctx.globalAlpha = Math.min(1, 0.55 + n.glow * 0.5);
+        ctx.drawImage(sprites[n.cl], P[0] - s / 2, P[1] - s / 2, s, s);
+      });
+      pulses.forEach(function (pl) {
+        var u = (now - pl.start) / pl.dur; if (u < 0 || u > 1) return;
+        var a3 = pl.a * 3, b3 = pl.b * 3;
+        var P = project(pos[a3] + (pos[b3] - pos[a3]) * u, pos[a3 + 1] + (pos[b3 + 1] - pos[a3 + 1]) * u, pos[a3 + 2] + (pos[b3 + 2] - pos[a3 + 2]) * u, tmp);
+        ctx.globalAlpha = 1; ctx.drawImage(white, P[0] - 10, P[1] - 10, 20, 20);
+      });
+      // core orb
+      var R = Math.min(w, h) * 0.08 * (1 + V.speak * 0.25 + 0.04 * Math.sin(now / 800));
+      var c = hue2rgb(0.48), g = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, R * 2.4);
+      g.addColorStop(0, 'rgba(255,255,255,0.95)'); g.addColorStop(0.3, rgbCss(c, 0.8)); g.addColorStop(1, rgbCss(c, 0));
+      ctx.globalAlpha = 1; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(w / 2, h / 2, R * 2.4, 0, 6.283); ctx.fill();
+      if (V.ring > 0.05) {
+        ctx.strokeStyle = rgbCss(c, 0.8 * V.ring); ctx.lineWidth = 2; ctx.beginPath();
+        for (var a = 0; a <= 64; a++) {
+          var ang = a / 64 * 6.283, rr = R * 1.9 * (1 + 0.08 * V.level * Math.sin(ang * 7 + now / 200));
+          ctx[a ? 'lineTo' : 'moveTo'](w / 2 + Math.cos(ang) * rr, h / 2 + Math.sin(ang) * rr);
+        }
+        ctx.stroke();
+      }
+      ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+    };
+  }
+  function BlobLite(canvas) {
+    var ctx = canvas.getContext('2d');
+    return function draw(now, poke, ripple) {
+      var w = canvas.width, h = canvas.height, cx = w / 2, cy = h / 2;
+      ctx.clearRect(0, 0, w, h);
+      var R = w * 0.3 * moodNow.size, c = hue2rgb(moodNow.hue), t = now / 1000 * (0.3 + moodNow.wob);
+      ctx.beginPath();
+      for (var i = 0; i <= 72; i++) {
+        var a = i / 72 * 6.283;
+        var n = Math.sin(a * 3 + t) * 0.5 + Math.sin(a * 5 - t * 1.3) * 0.3 + Math.sin(a * 11 + t * 2) * (1 - moodNow.smooth) * 0.6;
+        var r = R * (1 + n * (0.05 + moodNow.wob * 0.08) + ripple * 0.05 * Math.sin(a * 9 - t * 8));
+        ctx[i ? 'lineTo' : 'moveTo'](cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+      }
+      var g = ctx.createRadialGradient(cx - R * 0.3, cy - R * 0.4, R * 0.1, cx, cy, R * 1.2);
+      g.addColorStop(0, 'rgba(255,255,255,0.9)'); g.addColorStop(0.35, rgbCss(c, 0.95)); g.addColorStop(1, rgbCss([c[0] * 0.3, c[1] * 0.3, c[2] * 0.3], 1));
+      ctx.fillStyle = g; ctx.shadowColor = rgbCss(c, 0.8); ctx.shadowBlur = 24; ctx.fill(); ctx.shadowBlur = 0;
+    };
+  }
+
+  // ------------------------------------------------------------------
+  // Satellites: the last 30 check-ins orbiting the blob (2D overlay)
+  // ------------------------------------------------------------------
+  var history = [];
+  for (var hd = 29; hd >= 0; hd--) {
+    var m0 = 5 + 3 * Math.sin(hd / 4) + (rnd() - 0.5) * 2;
+    history.push({ day: hd, temper: Math.max(0, Math.min(10, m0)), note: hd === 0 ? 'today' : hd + ' days ago · sample' });
+  }
+  var satCanvas = $('sat'), satCtx = satCanvas.getContext('2d'), satHit = [];
+  function drawSats(now) {
+    var w = satCanvas.width, h = satCanvas.height, cx = w / 2, cy = h / 2;
+    satCtx.clearRect(0, 0, w, h); satHit = [];
+    var R = w * 0.43;
+    history.forEach(function (d, i) {
+      var a = i / history.length * 6.283 + now / 1000 * 0.06;
+      var r = R * (0.92 + 0.06 * Math.sin(now / 1500 + i));
+      var x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r * 0.82;
+      var c = hue2rgb(moodHue(d.temper)), s = (i === history.length - 1 ? 5 : 2.6) * DPR;
+      var g = satCtx.createRadialGradient(x, y, 0, x, y, s * 2.6);
+      g.addColorStop(0, 'rgba(255,255,255,0.95)'); g.addColorStop(0.35, rgbCss(c, 0.9)); g.addColorStop(1, rgbCss(c, 0));
+      satCtx.fillStyle = g; satCtx.beginPath(); satCtx.arc(x, y, s * 2.6, 0, 6.283); satCtx.fill();
+      satHit.push({ x: x / DPR, y: y / DPR, d: d });
+    });
+  }
+
+  // ------------------------------------------------------------------
+  // Boot: sizing, renderers, input
+  // ------------------------------------------------------------------
+  var brainCanvas = $('brain'), blobCanvas = $('blob');
+  function resize() {
+    W = window.innerWidth; H = window.innerHeight;
+    brainCanvas.width = Math.round(W * DPR); brainCanvas.height = Math.round(H * DPR);
+    var bw = $('blobwrap').clientWidth;
+    var blobScale = LITE ? 1 : Math.min(DPR, 1.25);
+    blobCanvas.width = blobCanvas.height = Math.round(bw * blobScale);
+    satCanvas.width = satCanvas.height = Math.round(bw * DPR);
+  }
+  window.addEventListener('resize', resize); resize();
+
+  var drawBrain = null, drawBlob = null;
+  if (!LITE) {
+    try { drawBrain = BrainGL(brainCanvas); } catch (e) { console.warn('brain GL failed', e); drawBrain = null; }
+    try { drawBlob = BlobGL(blobCanvas); } catch (e) { console.warn('blob GL failed', e); drawBlob = null; }
+  }
+  if (!drawBrain) { LITE = true; drawBrain = BrainLite(brainCanvas); }
+  if (!drawBlob) drawBlob = BlobLite(blobCanvas);
+  if (LITE) $('state').textContent = 'idle · lite';
+
+  // orbit / zoom / pick
+  var drag = null, pinch = null;
+  brainCanvas.addEventListener('pointerdown', function (e) {
+    drag = { x: e.clientX, y: e.clientY, moved: 0, yaw: cam.yaw, pitch: cam.pitch };
+    brainCanvas.setPointerCapture(e.pointerId); lastInteract = performance.now(); cam.autospin = 0;
+  });
+  brainCanvas.addEventListener('pointermove', function (e) {
+    if (!drag) return;
+    var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    drag.moved = Math.max(drag.moved, Math.abs(dx) + Math.abs(dy));
+    cam.yaw = drag.yaw + dx * 0.006; cam.pitch = Math.max(-1.3, Math.min(1.3, drag.pitch + dy * 0.006));
+    lastInteract = performance.now();
+  });
+  brainCanvas.addEventListener('pointerup', function (e) {
+    if (drag && drag.moved < 6) pick(e.clientX, e.clientY);
+    drag = null; setTimeout(function () { cam.autospin = 1; }, 4000);
+  });
+  brainCanvas.addEventListener('wheel', function (e) {
+    e.preventDefault(); cam.dist = Math.max(120, Math.min(520, cam.dist * (1 + e.deltaY * 0.001))); lastInteract = performance.now();
+  }, { passive: false });
+  brainCanvas.addEventListener('touchmove', function (e) {
+    if (e.touches.length !== 2) { pinch = null; return; }
+    var d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+    if (pinch) cam.dist = Math.max(120, Math.min(520, cam.dist * pinch / d));
+    pinch = d;
+  }, { passive: true });
+
+  function pick(x, y) {
+    var best = -1, bd = 22 * 22, tmp = [0, 0, 0, 0];
+    for (var i = 0; i < N; i++) {
+      var P = project(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2], tmp);
+      var d = (P[0] - x) * (P[0] - x) + (P[1] - y) * (P[1] - y);
+      if (d < bd) { bd = d; best = i; }
+    }
+    var info = $('info');
+    if (best < 0) { info.style.display = 'none'; return; }
+    var n = nodes[best]; n.glow = 1.6;
+    info.textContent = '';
+    var h3 = document.createElement('h3'); h3.textContent = n.label; info.appendChild(h3);
+    var k = document.createElement('div'); k.className = 'k'; k.textContent = n.kind + ' · ' + adj[best].length + ' links'; info.appendChild(k);
+    var l = document.createElement('div');
+    l.textContent = adj[best].slice(0, 8).map(function (j) { return nodes[j].label; }).join(' · ');
+    info.appendChild(l);
+    info.style.display = 'block';
+  }
+
+  // blob poke + satellite tap
+  var poke = [0, 0, 1, 0], pokeT = -1e9, ripple = 0;
+  $('blob').addEventListener('pointerdown', function (e) {
+    var r = this.getBoundingClientRect();
+    var ux = (e.clientX - r.left) / r.width * 2 - 1, uy = -((e.clientY - r.top) / r.height * 2 - 1);
+    for (var i = 0; i < satHit.length; i++) {
+      var s = satHit[i];
+      if (Math.hypot(s.x - (e.clientX - r.left), s.y - (e.clientY - r.top)) < 10) {
+        $('reply').textContent = 'Mood ' + s.d.temper.toFixed(1) + ' · ' + s.d.note; return;
+      }
+    }
+    var z = Math.sqrt(Math.max(0, 1 - ux * ux - uy * uy));
+    var l = Math.hypot(ux, uy, z) || 1;
+    poke = [ux / l, uy / l, z / l, 0]; pokeT = performance.now(); lastInteract = pokeT;
+  });
+
+  // HUD
+  $('b-listen').onclick = listen;
+  $('b-act').onclick = function () { act('Home Assistant'); };
+  $('ask').addEventListener('keydown', function (e) { if (e.key === 'Enter') { ask(this.value.trim()); this.value = ''; } });
+  [['m-temper', 'temper'], ['m-vital', 'vital'], ['m-recov', 'recov'], ['m-streak', 'streak']].forEach(function (pair) {
+    $(pair[0]).addEventListener('input', function () { mood[pair[1]] = parseFloat(this.value); lastInteract = performance.now(); });
+  });
+  $('b-check').onclick = function () {
+    ripple = 1; lastInteract = performance.now();
+    history.shift(); history.push({ day: 0, temper: mood.temper, note: 'just now' });
+    var mid = byName['Mood']; nodes[mid].glow = 2;
+    firePulse(mid, 0, 0, moodHue(mood.temper));
+  };
+
+  // ------------------------------------------------------------------
+  // Frame loop: 60 fps active, 15 fps idle, paused when hidden
+  // ------------------------------------------------------------------
+  var lastFrame = 0, lastT = performance.now();
+  function spring(key, target, dt) {
+    var k = 26, damp = 7.5;
+    var a = (target - moodNow[key]) * k - moodVel[key] * damp;
+    moodVel[key] += a * dt; moodNow[key] += moodVel[key] * dt;
+  }
+  function frame(now) {
+    requestAnimationFrame(frame);
+    if (document.hidden) return;
+    var active = V.state !== 'idle' || now - lastInteract < 3000 || ripple > 0.01;
+    var minGap = active ? 15 : 66;
+    if (now - lastFrame < minGap) return;
+    lastFrame = now;
+    var dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
+
+    // Virgil state blending
+    var tgtRing = V.state === 'listening' ? 1 : 0, tgtThink = V.state === 'thinking' ? 1 : 0;
+    V.ring += (tgtRing - V.ring) * Math.min(1, dt * 6);
+    V.think += (tgtThink - V.think) * Math.min(1, dt * 5);
+    var lvl = V.state === 'listening' ? micLevel(now) : V.state === 'speaking' ? speechEnvelope(now) : 0;
+    V.level += (lvl - V.level) * Math.min(1, dt * 18);
+    V.speak = V.state === 'speaking' ? V.level : V.speak * 0.85;
+    V.act = V.state === 'acting' ? Math.min(1, V.act + dt * 1.5) : Math.max(0, V.act - dt * 2);
+
+    // mood springs
+    var tg = moodTarget();
+    spring('hue', tg.hue, dt); spring('wob', tg.wob, dt); spring('smooth', tg.smooth, dt); spring('size', tg.size, dt);
+    applyAmbient();
+    ripple = Math.max(0, ripple - dt * 0.6);
+    var pt = (now - pokeT) / 1000;
+    poke[3] = pt < 3 ? Math.exp(-pt * 2.6) * Math.cos(pt * 11) : 0;
+
+    // pulses + node glow decay
+    for (var p = pulses.length - 1; p >= 0; p--) {
+      var pl = pulses[p];
+      if (now - pl.start > pl.dur) { pulses.splice(p, 1); if (pl.cb) pl.cb(); }
+    }
+    for (var i = 0; i < N; i++) nodes[i].glow *= Math.pow(0.35, dt);
+
+    if (cam.autospin && !drag) cam.yaw += dt * (V.state === 'idle' ? 0.04 : 0.09);
+
+    drawBrain(now, W, H);
+    drawBlob(now, poke, ripple);
+    drawSats(now);
+  }
+  requestAnimationFrame(frame);
+  var demo = (location.search.match(/demo=(\w+)/) || [])[1];
+  if (demo === 'think') setTimeout(function () { ask('war room notes'); }, 300);
+  if (demo === 'listen') setTimeout(listen, 300);
+  if (demo === 'act') setTimeout(function () { act('Home Assistant'); }, 300);
+})();
+</script>
+</body>
+</html>
