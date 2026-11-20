@@ -73,6 +73,8 @@ def lookup(question, notes, budget=1200, limit=2):
             scored.append((s, n))
     scored.sort(key=lambda x: -x[0])
     out, used = [], 0
+    # A weak runner-up (e.g. "working" matching a "work" note) is noise; drop it.
+    scored = [x for x in scored if x[0] * 2 >= scored[0][0]] if scored else []
     for _, n in scored[:limit]:
         block = f"{n['title']}: {n['body']}"
         if used + len(block) > budget:

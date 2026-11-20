@@ -248,8 +248,17 @@ class Hermes:
         r = http_json(c["url"].rstrip("/") + "/chat/completions", "POST",
                       {"model": c.get("model", "hermes3:3b"),
                        "messages": [{"role": "system", "content": sys_prompt}]
-                       + Hermes.HISTORY[:-1] + turn},
+                       + Hermes.HISTORY[:-1] + turn,
+                       # Spoken replies: a hard cap keeps a 6 tok/s CPU brain under ~15 s.
+                       "max_tokens": c.get("max_tokens", 80),
+                       "temperature": c.get("temperature", 0.3)},
                       {"Authorization": "Bearer " + (c.get("api_key") or "local")}, timeout=120)
-        reply = r["choices"][0]["message"]["content"].strip()
+        choice = r["choices"][0]
+        reply = choice["message"]["content"].strip()
+        if choice.get("finish_reason") == "length":
+            # Cut off by max_tokens: end on the last whole sentence so it speaks cleanly.
+            m = re.search(r"^.*[^\s\d][.!?](?=\s|$)", reply, re.S)
+            if m:
+                reply = m.group(0)
         Hermes.HISTORY.append({"role": "assistant", "content": reply})
         return reply
