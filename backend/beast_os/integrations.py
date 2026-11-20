@@ -14,6 +14,8 @@ import time
 import urllib.parse
 import urllib.request
 
+from beast_os import virgil_notes
+
 CFG = {}          # filled by kernel.load_config()
 
 DEFAULT_HA_ALLOW = ["light.*", "switch.turn_on", "switch.turn_off", "switch.toggle",
@@ -236,10 +238,17 @@ class Hermes:
         c = CFG["llm"]
         Hermes.HISTORY.append({"role": "user", "content": text[:4000]})
         Hermes.HISTORY[:] = Hermes.HISTORY[-12:]
-        sys_prompt = c.get("system", "") + (f" The user is in the {room}." if room else "")
+        core, notes = virgil_notes.context_for(text, c)
+        # Core notes sit in the system prompt (same every turn, so Ollama caches it);
+        # looked-up notes ride only on this turn's question and aren't kept in history.
+        sys_prompt = c.get("system", "") + ("\n\n" + core if core else "")
+        if room:
+            sys_prompt += f"\nThe user is in the {room}."
+        turn = [{"role": "user", "content": notes + text[:4000]}]
         r = http_json(c["url"].rstrip("/") + "/chat/completions", "POST",
                       {"model": c.get("model", "hermes3:3b"),
-                       "messages": [{"role": "system", "content": sys_prompt}] + Hermes.HISTORY},
+                       "messages": [{"role": "system", "content": sys_prompt}]
+                       + Hermes.HISTORY[:-1] + turn},
                       {"Authorization": "Bearer " + (c.get("api_key") or "local")}, timeout=120)
         reply = r["choices"][0]["message"]["content"].strip()
         Hermes.HISTORY.append({"role": "assistant", "content": reply})
